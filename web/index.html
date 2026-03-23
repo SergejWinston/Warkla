@@ -171,7 +171,40 @@
 
         <article id="transactions" class="card tx-list-card" data-view-item="history">
           <h2 data-i18n="recent_transactions">Recent transactions</h2>
+          <div class="history-toolbar" role="group" aria-label="History filters">
+            <div class="history-toolbar-row history-toolbar-row--top">
+              <input id="historySearch" type="search" class="history-search" data-i18n-placeholder="history_search_placeholder" placeholder="Search notes, categories, source" />
+              <select id="historySort" class="history-select" aria-label="Sort history">
+                <option value="newest" data-i18n="history_sort_newest">Newest first</option>
+                <option value="oldest" data-i18n="history_sort_oldest">Oldest first</option>
+                <option value="amount-desc" data-i18n="history_sort_amount_desc">Amount high to low</option>
+                <option value="amount-asc" data-i18n="history_sort_amount_asc">Amount low to high</option>
+              </select>
+            </div>
+            <div class="history-toolbar-row history-toolbar-row--filters">
+              <select id="historyType" class="history-select" aria-label="Type filter">
+                <option value="all" data-i18n="history_type_all">All types</option>
+                <option value="expense" data-i18n="type_expense">Expense</option>
+                <option value="income" data-i18n="type_income">Income</option>
+              </select>
+              <select id="historyCategory" class="history-select" aria-label="Category filter">
+                <option value="all" data-i18n="history_category_all">All categories</option>
+              </select>
+              <input id="historyDateFrom" type="date" class="history-date" aria-label="From date" />
+              <input id="historyDateTo" type="date" class="history-date" aria-label="To date" />
+              <button id="historyApplyBtn" type="button" class="ghost" data-i18n="history_apply">Apply</button>
+              <button id="historyResetBtn" type="button" class="ghost" data-i18n="history_reset">Reset</button>
+            </div>
+          </div>
+          <div class="history-status-row">
+            <p id="historyStatus" class="history-status sub"></p>
+            <button id="historyRetryBtn" type="button" class="ghost" data-i18n="history_retry" aria-label="Retry">Retry</button>
+          </div>
+          <div id="historyError" class="history-error" hidden>
+            <span id="historyErrorText"></span>
+          </div>
           <div id="txList" class="tx-list"></div>
+          <button id="historyLoadMoreBtn" type="button" class="ghost history-load-more" hidden data-i18n="history_load_more">Load more</button>
         </article>
 
         <article id="achievements-menu" class="card achievements-card" data-view-item="achievements">

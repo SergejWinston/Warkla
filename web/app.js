@@ -14,6 +14,21 @@ const state = {
   analyticsSources: [],
   analyticsComparison: null,
   analyticsAnomalies: [],
+  history: {
+    query: "",
+    sort: "newest",
+    type: "all",
+    category: "all",
+    dateFrom: "",
+    dateTo: "",
+    page: 1,
+    perPage: 20,
+    total: 0,
+    pages: 1,
+    hasMore: false,
+    loading: false,
+    items: [],
+  },
 };
 
 const t = window.I18N ? window.I18N.t : (key) => key;
@@ -80,7 +95,29 @@ const el = {
   quickActionBtns: Array.from(document.querySelectorAll("[data-quick-action]")),
   goHistoryBtn: document.getElementById("goHistoryBtn"),
   goAchievementsBtn: document.getElementById("goAchievementsBtn"),
+  historySearch: document.getElementById("historySearch"),
+  historySort: document.getElementById("historySort"),
+  historyType: document.getElementById("historyType"),
+  historyCategory: document.getElementById("historyCategory"),
+  historyDateFrom: document.getElementById("historyDateFrom"),
+  historyDateTo: document.getElementById("historyDateTo"),
+  historyApplyBtn: document.getElementById("historyApplyBtn"),
+  historyResetBtn: document.getElementById("historyResetBtn"),
+  historyStatus: document.getElementById("historyStatus"),
+  historyError: document.getElementById("historyError"),
+  historyErrorText: document.getElementById("historyErrorText"),
+  historyRetryBtn: document.getElementById("historyRetryBtn"),
+  historyLoadMoreBtn: document.getElementById("historyLoadMoreBtn"),
 };
+
+function escapeHtml(value) {
+  return String(value == null ? "" : value)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;");
+}
 
 function money(value) {
   const numeric = Number(value || 0);
@@ -290,19 +327,284 @@ function renderTransactions(items, targetElement, limit = null) {
       const sign = tx.type === "expense" ? "-" : "+";
       const title = tx.category ? capitalizeCategoryLabel(tx.category) : tx.source || "item";
       const typeClass = tx.type === "expense" ? "tx-item--expense" : "tx-item--income";
-      const iconText = tx.type === "expense" ? "OUT" : "IN";
+      const iconText = tx.type === "expense" ? "↓" : "↑";
+      const typeLabel = tx.type === "expense" ? t("type_expense") : t("type_income");
+      const noteLine = tx.note ? `<div class="tx-note">${escapeHtml(tx.note)}</div>` : "";
+      const metaLine = [tx.date || "", tx.source ? escapeHtml(tx.source) : ""].filter(Boolean).join(" · ");
       return `
         <div class="tx-item ${typeClass}">
-          <span class="tx-type-icon ${tx.type}">${iconText}</span>
-          <div>
-            <strong>${title}</strong>
-            <div class="meta">${tx.date || ""} ${tx.note ? "- " + tx.note : ""}</div>
+          <div class="tx-main">
+            <span class="tx-type-icon ${tx.type}">${iconText}</span>
+            <div class="tx-copy">
+              <div class="tx-title-row">
+                <strong class="tx-title">${escapeHtml(title)}</strong>
+                <span class="tx-chip">${escapeHtml(typeLabel)}</span>
+              </div>
+              <div class="meta">${metaLine || "-"}</div>
+              ${noteLine}
+            </div>
           </div>
-          <strong>${sign}${money(tx.amount)}</strong>
+          <strong class="tx-amount">${sign}${money(tx.amount)}</strong>
         </div>
       `;
     })
     .join("");
+}
+
+function readHistoryControls() {
+  state.history.query = el.historySearch ? el.historySearch.value.trim() : "";
+  state.history.sort = el.historySort ? el.historySort.value : "newest";
+  state.history.type = el.historyType ? el.historyType.value : "all";
+  state.history.category = el.historyCategory ? el.historyCategory.value : "all";
+  state.history.dateFrom = el.historyDateFrom ? el.historyDateFrom.value : "";
+  state.history.dateTo = el.historyDateTo ? el.historyDateTo.value : "";
+}
+
+function syncHistoryControlsFromState() {
+  if (el.historySearch) {
+    el.historySearch.value = state.history.query;
+  }
+  if (el.historySort) {
+    el.historySort.value = state.history.sort;
+  }
+  if (el.historyType) {
+    el.historyType.value = state.history.type;
+  }
+  if (el.historyCategory) {
+    el.historyCategory.value = state.history.category;
+  }
+  if (el.historyDateFrom) {
+    el.historyDateFrom.value = state.history.dateFrom;
+  }
+  if (el.historyDateTo) {
+    el.historyDateTo.value = state.history.dateTo;
+  }
+}
+
+function setHistoryError(message = "") {
+  if (!el.historyError || !el.historyErrorText) {
+    return;
+  }
+
+  if (!message) {
+    el.historyError.hidden = true;
+    el.historyErrorText.textContent = "";
+    return;
+  }
+
+  el.historyError.hidden = false;
+  el.historyErrorText.textContent = message;
+}
+
+function setHistoryLoading(isLoading) {
+  state.history.loading = isLoading;
+
+  const toggleDisabled = (node) => {
+    if (node) {
+      node.disabled = isLoading;
+    }
+  };
+
+  toggleDisabled(el.historyApplyBtn);
+  toggleDisabled(el.historyResetBtn);
+  toggleDisabled(el.historyLoadMoreBtn);
+}
+
+function buildHistoryQuery(page = 1) {
+  const params = new URLSearchParams();
+  params.set("page", String(page));
+  params.set("per_page", String(state.history.perPage));
+
+  if (state.history.type !== "all") {
+    params.set("type", state.history.type);
+  }
+  if (state.history.category !== "all") {
+    params.set("category", state.history.category);
+  }
+  if (state.history.dateFrom) {
+    params.set("date_from", state.history.dateFrom);
+  }
+  if (state.history.dateTo) {
+    params.set("date_to", state.history.dateTo);
+  }
+
+  return params.toString();
+}
+
+function getClientSearchResult(items) {
+  const query = state.history.query.trim().toLowerCase();
+  if (!query) {
+    return [...items];
+  }
+
+  return items.filter((tx) => {
+    const haystack = [
+      tx.note || "",
+      tx.category || "",
+      tx.source || "",
+      tx.date || "",
+      String(tx.amount || ""),
+    ]
+      .join(" ")
+      .toLowerCase();
+    return haystack.includes(query);
+  });
+}
+
+function sortHistoryItems(items) {
+  const sorted = [...items];
+  const byDate = (a, b) => {
+    const aDate = new Date(a.date || 0).getTime();
+    const bDate = new Date(b.date || 0).getTime();
+    if (aDate !== bDate) {
+      return bDate - aDate;
+    }
+    return Number(b.id || 0) - Number(a.id || 0);
+  };
+
+  switch (state.history.sort) {
+    case "oldest":
+      sorted.sort((a, b) => -byDate(a, b));
+      break;
+    case "amount-desc":
+      sorted.sort((a, b) => Number(b.amount || 0) - Number(a.amount || 0));
+      break;
+    case "amount-asc":
+      sorted.sort((a, b) => Number(a.amount || 0) - Number(b.amount || 0));
+      break;
+    default:
+      sorted.sort(byDate);
+      break;
+  }
+
+  return sorted;
+}
+
+function renderHistoryStatus(visibleCount) {
+  if (!el.historyStatus) {
+    return;
+  }
+
+  const loadedCount = state.history.items.length;
+  if (state.history.loading) {
+    el.historyStatus.textContent = t("history_loading");
+    return;
+  }
+
+  el.historyStatus.textContent = `${t("history_status_visible")}: ${visibleCount} · ${t("history_status_loaded")}: ${loadedCount} · ${t("history_status_total")}: ${state.history.total}`;
+}
+
+function renderHistoryList() {
+  const searched = getClientSearchResult(state.history.items);
+  const sorted = sortHistoryItems(searched);
+
+  if (!sorted.length) {
+    const key = state.history.items.length > 0 ? "history_no_matches" : "no_transactions";
+    el.txList.innerHTML = `<p class="sub">${t(key)}</p>`;
+  } else {
+    renderTransactions(sorted, el.txList);
+  }
+
+  renderHistoryStatus(sorted.length);
+
+  if (el.historyLoadMoreBtn) {
+    const showLoadMore = state.history.hasMore && !state.history.loading;
+    el.historyLoadMoreBtn.hidden = !showLoadMore;
+  }
+}
+
+function updateHistoryCategoryOptions() {
+  if (!el.historyCategory) {
+    return;
+  }
+
+  const options = new Map();
+  options.set("all", t("history_category_all"));
+
+  const collect = (value) => {
+    const normalized = String(value || "").trim();
+    if (!normalized) {
+      return;
+    }
+    options.set(normalized, capitalizeCategoryLabel(normalized));
+  };
+
+  state.categories.forEach((item) => collect(item.category));
+  state.transactions.forEach((item) => collect(item.category));
+  state.history.items.forEach((item) => collect(item.category));
+  if (state.history.category !== "all") {
+    collect(state.history.category);
+  }
+
+  el.historyCategory.innerHTML = Array.from(options.entries())
+    .map(([value, label]) => `<option value="${escapeHtml(value)}">${escapeHtml(label)}</option>`)
+    .join("");
+
+  el.historyCategory.value = options.has(state.history.category) ? state.history.category : "all";
+}
+
+function mergeHistoryItems(current, incoming) {
+  const seen = new Set();
+  const merged = [];
+
+  [...current, ...incoming].forEach((item) => {
+    const key = Number(item.id || 0);
+    if (seen.has(key)) {
+      return;
+    }
+    seen.add(key);
+    merged.push(item);
+  });
+
+  return merged;
+}
+
+async function loadHistoryPage(page = 1, append = false) {
+  readHistoryControls();
+  setHistoryError("");
+  setHistoryLoading(true);
+
+  if (!append) {
+    el.txList.innerHTML = `<p class="sub">${t("history_loading")}</p>`;
+    renderHistoryStatus(0);
+  }
+
+  try {
+    const query = buildHistoryQuery(page);
+    const response = await api(`/api/transactions?${query}`);
+    const incoming = response.items || [];
+
+    state.history.page = Number(response.page || page);
+    state.history.pages = Number(response.pages || 1);
+    state.history.total = Number(response.total || incoming.length);
+    state.history.hasMore = state.history.page < state.history.pages;
+    state.history.items = append ? mergeHistoryItems(state.history.items, incoming) : incoming;
+
+    updateHistoryCategoryOptions();
+    renderHistoryList();
+  } catch (error) {
+    state.history.hasMore = false;
+    setHistoryError(error.message || t("request_failed"));
+    renderHistoryStatus(getClientSearchResult(state.history.items).length);
+  } finally {
+    setHistoryLoading(false);
+    renderHistoryStatus(getClientSearchResult(state.history.items).length);
+    if (el.historyLoadMoreBtn) {
+      el.historyLoadMoreBtn.hidden = !(state.history.hasMore && !state.history.loading);
+    }
+  }
+}
+
+function hydrateHistoryFromDashboard(transactionsPayload) {
+  const items = transactionsPayload.items || [];
+  state.history.page = Number(transactionsPayload.page || 1);
+  state.history.pages = Number(transactionsPayload.pages || 1);
+  state.history.total = Number(transactionsPayload.total || items.length);
+  state.history.hasMore = state.history.page < state.history.pages;
+  state.history.items = items;
+  syncHistoryControlsFromState();
+  updateHistoryCategoryOptions();
+  renderHistoryList();
 }
 
 function renderAdvancedAnalytics() {
@@ -800,7 +1102,7 @@ async function refreshDashboard() {
   renderGoalWidget(dashboard);
   renderRiskWidget(dashboard);
   renderTopCategories(state.categories);
-  renderTransactions(state.transactions, el.txList);
+  hydrateHistoryFromDashboard(transactions);
   renderTransactions(state.transactions, el.summaryTxList, 5);
   renderAchievements(state.achievements, el.achievements);
   renderAchievements(state.achievements, el.summaryAchievements, true, 3);
@@ -961,7 +1263,8 @@ window.addEventListener("warkla:langchange", () => {
     renderGoalWidget(state.dashboard);
     renderRiskWidget(state.dashboard);
     renderTopCategories(state.categories);
-    renderTransactions(state.transactions, el.txList);
+    updateHistoryCategoryOptions();
+    renderHistoryList();
     renderTransactions(state.transactions, el.summaryTxList, 5);
     renderAchievements(state.achievements, el.achievements);
     renderAchievements(state.achievements, el.summaryAchievements, true, 3);
@@ -972,6 +1275,54 @@ window.addEventListener("warkla:langchange", () => {
 
   setGoalMessage("");
 });
+
+if (el.historySearch) {
+  el.historySearch.addEventListener("input", () => {
+    state.history.query = el.historySearch.value.trim();
+    renderHistoryList();
+  });
+}
+
+if (el.historySort) {
+  el.historySort.addEventListener("change", () => {
+    state.history.sort = el.historySort.value;
+    renderHistoryList();
+  });
+}
+
+if (el.historyApplyBtn) {
+  el.historyApplyBtn.addEventListener("click", async () => {
+    await loadHistoryPage(1, false);
+  });
+}
+
+if (el.historyResetBtn) {
+  el.historyResetBtn.addEventListener("click", async () => {
+    state.history.query = "";
+    state.history.sort = "newest";
+    state.history.type = "all";
+    state.history.category = "all";
+    state.history.dateFrom = "";
+    state.history.dateTo = "";
+    syncHistoryControlsFromState();
+    await loadHistoryPage(1, false);
+  });
+}
+
+if (el.historyLoadMoreBtn) {
+  el.historyLoadMoreBtn.addEventListener("click", async () => {
+    if (!state.history.hasMore || state.history.loading) {
+      return;
+    }
+    await loadHistoryPage(state.history.page + 1, true);
+  });
+}
+
+if (el.historyRetryBtn) {
+  el.historyRetryBtn.addEventListener("click", async () => {
+    await loadHistoryPage(Math.max(1, state.history.page), false);
+  });
+}
 
 el.logoutBtn.addEventListener("click", () => {
   state.token = "";
