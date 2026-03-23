@@ -1,0 +1,153 @@
+name: Build & Deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: sergejwinston/warkla
+
+jobs:
+  build:
+    name: Build Docker Image
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    outputs:
+      image_tag: ${{ steps.meta.outputs.tags }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=sha,prefix=
+            type=raw,value=latest
+
+      - name: Build and push image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+
+  deploy:
+    name: Deploy to Server
+    needs: build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Copy config files to server
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_KEY }}
+          port: ${{ secrets.SSH_PORT || 22 }}
+          source: "deploy/nginx-docker.conf,.env.example"
+          target: /opt/warkla
+          strip_components: 0
+
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1
+        env:
+          IMAGE: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+          GH_PAT: ${{ secrets.GH_PAT }}
+          GH_USER: ${{ github.actor }}
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_KEY }}
+          port: ${{ secrets.SSH_PORT || 22 }}
+          envs: IMAGE,GH_PAT,GH_USER
+          script: |
+            set -e
+
+            # Install Docker if not present
+            if ! command -v docker > /dev/null 2>&1; then
+              echo "Installing Docker..."
+              curl -fsSL https://get.docker.com | sh
+            fi
+
+            # Check .env exists, create from example if not
+            if [ ! -f /opt/warkla/.env ]; then
+              cp /opt/warkla/.env.example /opt/warkla/.env
+              echo "/opt/warkla/.env was created from .env.example"
+              echo "Fill in SECRET_KEY, JWT_SECRET_KEY, DOMAIN and other values, then re-run the workflow."
+              exit 1
+            fi
+
+            # Login to GHCR
+            echo "$GH_PAT" | docker login ghcr.io -u "$GH_USER" --password-stdin
+
+            # Pull new image
+            docker pull "$IMAGE"
+
+            # Stop old containers (ignore if not running)
+            docker stop warkla-nginx 2>/dev/null || true
+            docker rm warkla-nginx 2>/dev/null || true
+            docker stop warkla 2>/dev/null || true
+            docker rm warkla 2>/dev/null || true
+
+            # Create network if not exists
+            docker network create warkla-net 2>/dev/null || true
+
+            # Start new app container
+            docker run -d \
+              --name warkla \
+              --restart always \
+              --env-file /opt/warkla/.env \
+              --add-host host.docker.internal:host-gateway \
+              -v warkla_db:/app/instance \
+              -v warkla_uploads:/app/uploads \
+              -v /etc/postfix/vmailbox:/etc/postfix/vmailbox \
+              -v /var/mail/vhosts:/var/mail/vhosts \
+              --network warkla-net \
+              "$IMAGE"
+
+            # Run migrations if configured
+            docker exec warkla flask db upgrade || true
+
+            # Prepare nginx config with domain substitution
+            DOMAIN=$(grep -oP '^DOMAIN=\K.*' /opt/warkla/.env || echo "localhost")
+            export DOMAIN
+            envsubst '${DOMAIN}' < /opt/warkla/deploy/nginx-docker.conf > /opt/warkla/nginx.conf
+
+            # Start/restart nginx
+            docker stop warkla-nginx 2>/dev/null || true
+            docker rm warkla-nginx 2>/dev/null || true
+            docker run -d \
+              --name warkla-nginx \
+              --restart always \
+              --network warkla-net \
+              -p 80:80 \
+              -p 443:443 \
+              -v /opt/warkla/nginx.conf:/etc/nginx/conf.d/default.conf:ro \
+              -v /etc/letsencrypt:/etc/letsencrypt:ro \
+              -v /var/www/certbot:/var/www/certbot:ro \
+              nginx:alpine
+
+            # Cleanup old dangling images
+            docker image prune -f
+
+            echo "Deploy complete"

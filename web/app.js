@@ -14,6 +14,11 @@ const state = {
   analyticsSources: [],
   analyticsComparison: null,
   analyticsAnomalies: [],
+  achievementsUi: {
+    filter: "all",
+    sort: "progress",
+    query: "",
+  },
   history: {
     query: "",
     sort: "newest",
@@ -32,6 +37,46 @@ const state = {
 };
 
 const t = window.I18N ? window.I18N.t : (key) => key;
+
+const WARNING_TEXT_TO_KEY = {
+  "today's spending is above your safe daily limit.": "warning_daily_limit_exceeded",
+  "todays spending is above your safe daily limit.": "warning_daily_limit_exceeded",
+  "forecast is negative. consider reducing daily expenses.": "warning_negative_forecast",
+  "no expenses logged today yet. keep tracking to stay in control.": "warning_no_expenses_today",
+  "budget is depleted. new expenses can quickly worsen your outlook.": "warning_budget_depleted",
+  "budget looks stable for now.": "warning_budget_stable",
+  "сегодняшние траты выше безопасного дневного лимита.": "warning_daily_limit_exceeded",
+  "прогноз отрицательный. стоит сократить дневные расходы.": "warning_negative_forecast",
+  "сегодня расходов еще нет. продолжайте вести учет, чтобы держать контроль.": "warning_no_expenses_today",
+  "бюджет на нуле. новые расходы могут быстро ухудшить прогноз.": "warning_budget_depleted",
+  "с бюджетом все стабильно на текущий момент.": "warning_budget_stable",
+};
+
+function normalizeWarningText(text) {
+  return String(text || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[\u2019']/g, "")
+    .replace(/\s+/g, " ");
+}
+
+function resolveWarningText(dashboard) {
+  const warningKey = String(dashboard.warning_key || "").trim();
+  if (warningKey) {
+    const translated = t(warningKey);
+    if (translated && translated !== warningKey) {
+      return translated;
+    }
+  }
+
+  const rawWarning = String(dashboard.warning || "").trim();
+  if (!rawWarning) {
+    return "";
+  }
+
+  const fallbackKey = WARNING_TEXT_TO_KEY[normalizeWarningText(rawWarning)];
+  return fallbackKey ? t(fallbackKey) : rawWarning;
+}
 
 const el = {
   logoutBtn: document.getElementById("logoutBtn"),
@@ -80,6 +125,11 @@ const el = {
   summaryTxList: document.getElementById("summaryTxList"),
   achievements: document.getElementById("achievements"),
   summaryAchievements: document.getElementById("summaryAchievements"),
+  achievementsSummaryStats: document.getElementById("achievementsSummaryStats"),
+  achievementsFilter: document.getElementById("achievementsFilter"),
+  achievementsSort: document.getElementById("achievementsSort"),
+  achievementsSearch: document.getElementById("achievementsSearch"),
+  achievementsClearFilters: document.getElementById("achievementsClearFilters"),
   categoryChart: document.getElementById("categoryChart"),
   timelineChart: document.getElementById("timelineChart"),
   analyticsStats: document.getElementById("analyticsStats"),
@@ -670,21 +720,98 @@ function renderAdvancedAnalytics() {
   el.analyticsInsights.innerHTML = insightBlocks.join("");
 }
 
+function localizeAchievement(item) {
+  if (window.I18N && window.I18N.getAchievementText) {
+    return window.I18N.getAchievementText(item.key, item.title, item.description);
+  }
+  return { title: item.title, description: item.description };
+}
+
+function getAchievementStatus(item) {
+  if (item.unlocked) {
+    return "unlocked";
+  }
+
+  return Number(item.progress_percent || 0) > 0 ? "in-progress" : "locked";
+}
+
+function toAchievementDate(dateText) {
+  if (!dateText) {
+    return null;
+  }
+
+  const date = new Date(dateText);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function formatAchievementDate(dateText) {
+  const date = toAchievementDate(dateText);
+  if (!date) {
+    return "";
+  }
+
+  const locale = window.I18N && window.I18N.getLanguage && window.I18N.getLanguage() === "ru" ? "ru-RU" : "en-US";
+  const dayMs = 24 * 60 * 60 * 1000;
+  const now = new Date();
+  const nowMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+  const dateMidnight = new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
+  const dayDiff = Math.floor((nowMidnight - dateMidnight) / dayMs);
+
+  if (dayDiff === 0) {
+    return `${date.toLocaleDateString(locale)} · ${t("achievement_today")}`;
+  }
+  if (dayDiff === 1) {
+    return `${date.toLocaleDateString(locale)} · ${t("achievement_yesterday")}`;
+  }
+
+  return date.toLocaleDateString(locale);
+}
+
+function getAchievementHint(item, status) {
+  if (status === "unlocked") {
+    return t("achievement_completed_hint");
+  }
+
+  const remaining = Math.max(0, Number(item.threshold || 0) - Number(item.progress_value || 0));
+  if (remaining <= 1) {
+    return t("achievement_one_left");
+  }
+  if (Number(item.progress_percent || 0) >= 80) {
+    return t("achievement_near_goal");
+  }
+
+  return t("achievement_keep_going");
+}
+
 function achievementCard(item, compact = false) {
   const localized = window.I18N && window.I18N.getAchievementText
     ? window.I18N.getAchievementText(item.key, item.title, item.description)
     : { title: item.title, description: item.description };
-  const stateClass = item.unlocked ? "unlocked" : "locked";
-  const stateLabel = item.unlocked ? t("achievement_unlocked") : t("achievement_locked");
-  const unlockedDate = item.unlocked && item.unlocked_at ? new Date(item.unlocked_at).toLocaleDateString() : "";
+  const status = getAchievementStatus(item);
+  const stateClass = `state-${status}`;
+  const stateLabel =
+    status === "unlocked"
+      ? t("achievement_unlocked")
+      : status === "in-progress"
+        ? t("achievement_in_progress")
+        : t("achievement_locked");
+  const unlockedDate = item.unlocked && item.unlocked_at ? formatAchievementDate(item.unlocked_at) : "";
   const stateMeta = unlockedDate ? `${stateLabel} • ${unlockedDate}` : stateLabel;
+  const progressPercent = Math.max(0, Math.min(100, Number(item.progress_percent || 0)));
+  const nearCompleteClass = !item.unlocked && progressPercent >= 80 ? "near-complete" : "";
+  const description = escapeHtml(localized.description || "");
+  const title = escapeHtml(localized.title || item.key);
+  const hint = getAchievementHint(item, status);
+
+  const cardLabel = `${localized.title}. ${stateLabel}. ${t("progress")}: ${item.progress_value} / ${item.threshold} (${progressPercent}%)`;
 
   if (compact) {
     return `
-      <div class="badge ${stateClass}">
+      <div class="badge ${stateClass} ${nearCompleteClass}" tabindex="0" role="listitem" aria-label="${escapeHtml(cardLabel)}">
         <div class="badge-head">
-          <span class="achievement-icon ${item.metric}"></span>
-          <strong>${localized.title}</strong>
+          <span class="achievement-icon ${item.metric}" aria-hidden="true"></span>
+          <strong>${title}</strong>
+          <span class="badge-percent-pill">${progressPercent}%</span>
         </div>
         <div class="badge-meta">${stateMeta}</div>
       </div>
@@ -692,29 +819,168 @@ function achievementCard(item, compact = false) {
   }
 
   return `
-    <div class="badge ${stateClass}">
-      <div class="badge-head">
-        <span class="achievement-icon ${item.metric}"></span>
-        <strong>${localized.title}</strong>
+    <div class="badge ${stateClass} ${nearCompleteClass}" tabindex="0" role="listitem" aria-label="${escapeHtml(cardLabel)}">
+      <div class="badge-topline">
+        <span class="badge-state-pill">${stateLabel}</span>
+        <span class="badge-percent-pill">${progressPercent}%</span>
       </div>
-      <div>${localized.description}</div>
+      <div class="badge-head">
+        <span class="achievement-icon ${item.metric}" aria-hidden="true"></span>
+        <strong>${title}</strong>
+      </div>
+      <div>${description}</div>
       <div class="badge-meta">${stateMeta}</div>
       <div class="achievement-progress">
-        <div class="achievement-progress-fill" style="width: ${item.progress_percent}%"></div>
+        <div class="achievement-progress-fill" style="width: ${progressPercent}%"></div>
       </div>
-      <div class="badge-progress-text">${t("progress")}: ${item.progress_value} / ${item.threshold} (${item.progress_percent}%)</div>
+      <div class="badge-progress-text">${t("progress")}: ${item.progress_value} / ${item.threshold} (${progressPercent}%)</div>
+      <div class="badge-hint">${hint}</div>
     </div>
   `;
 }
 
-function renderAchievements(items, targetElement, compact = false, limit = null) {
-  const normalized = limit ? items.slice(0, limit) : items;
+function sortAchievements(items, sortMode = "progress") {
+  const normalized = [...items];
+
+  if (sortMode === "title") {
+    normalized.sort((a, b) => {
+      const aTitle = localizeAchievement(a).title || a.key;
+      const bTitle = localizeAchievement(b).title || b.key;
+      return aTitle.localeCompare(bTitle);
+    });
+    return normalized;
+  }
+
+  if (sortMode === "recent") {
+    normalized.sort((a, b) => {
+      const aDate = toAchievementDate(a.unlocked_at);
+      const bDate = toAchievementDate(b.unlocked_at);
+      const aUnlocked = a.unlocked ? 1 : 0;
+      const bUnlocked = b.unlocked ? 1 : 0;
+      if (aUnlocked !== bUnlocked) {
+        return bUnlocked - aUnlocked;
+      }
+      if (aDate && bDate && aDate.getTime() !== bDate.getTime()) {
+        return bDate.getTime() - aDate.getTime();
+      }
+      return Number(b.progress_percent || 0) - Number(a.progress_percent || 0);
+    });
+    return normalized;
+  }
+
+  normalized.sort((a, b) => {
+    if (a.unlocked !== b.unlocked) {
+      return Number(b.unlocked) - Number(a.unlocked);
+    }
+    const progressDiff = Number(b.progress_percent || 0) - Number(a.progress_percent || 0);
+    if (progressDiff !== 0) {
+      return progressDiff;
+    }
+    return Number(a.threshold || 0) - Number(b.threshold || 0);
+  });
+  return normalized;
+}
+
+function filterAchievements(items, filterMode = "all", query = "") {
+  const normalizedQuery = query.trim().toLowerCase();
+
+  return items.filter((item) => {
+    const status = getAchievementStatus(item);
+    if (filterMode !== "all" && status !== filterMode) {
+      return false;
+    }
+
+    if (!normalizedQuery) {
+      return true;
+    }
+
+    const localized = localizeAchievement(item);
+    const haystack = `${localized.title || ""} ${localized.description || ""}`.toLowerCase();
+    return haystack.includes(normalizedQuery);
+  });
+}
+
+function renderAchievements(items, targetElement, options = {}) {
+  const { compact = false, limit = null, filter = "all", sort = "progress", query = "" } = options;
+  const filtered = filterAchievements(items, filter, query);
+  const sorted = sortAchievements(filtered, sort);
+  const normalized = limit ? sorted.slice(0, limit) : sorted;
+
   if (!normalized.length) {
-    targetElement.innerHTML = `<p class="sub">${t("no_achievements")}</p>`;
+    const emptyKey = items.length > 0 ? "achievements_no_matches" : "no_achievements";
+    targetElement.innerHTML = `<p class="sub">${t(emptyKey)}</p>`;
     return;
   }
 
   targetElement.innerHTML = normalized.map((item) => achievementCard(item, compact)).join("");
+}
+
+function renderAchievementsSummary(items) {
+  if (!el.achievementsSummaryStats) {
+    return;
+  }
+
+  const total = items.length;
+  if (!total) {
+    el.achievementsSummaryStats.innerHTML = `<p class="sub">${t("no_achievements")}</p>`;
+    return;
+  }
+
+  const unlockedCount = items.filter((item) => item.unlocked).length;
+  const completion = Math.round((unlockedCount / total) * 100);
+  const next = sortAchievements(
+    items.filter((item) => !item.unlocked),
+    "progress",
+  )[0];
+
+  let nextText = "-";
+  if (next) {
+    const localized = localizeAchievement(next);
+    const remaining = Math.max(0, Number(next.threshold || 0) - Number(next.progress_value || 0));
+    nextText = `${localized.title} · ${remaining}`;
+  }
+
+  el.achievementsSummaryStats.innerHTML = `
+    <div class="achievement-summary-item">
+      <span class="achievement-summary-label">${t("achievements_summary_unlocked")}</span>
+      <strong class="achievement-summary-value">${unlockedCount}/${total}</strong>
+    </div>
+    <div class="achievement-summary-item">
+      <span class="achievement-summary-label">${t("achievements_summary_completion")}</span>
+      <strong class="achievement-summary-value">${completion}%</strong>
+    </div>
+    <div class="achievement-summary-item">
+      <span class="achievement-summary-label">${t("achievements_summary_next")}</span>
+      <strong class="achievement-summary-value">${escapeHtml(nextText)}</strong>
+    </div>
+  `;
+}
+
+function syncAchievementControls() {
+  if (el.achievementsFilter) {
+    el.achievementsFilter.value = state.achievementsUi.filter;
+  }
+  if (el.achievementsSort) {
+    el.achievementsSort.value = state.achievementsUi.sort;
+  }
+  if (el.achievementsSearch) {
+    el.achievementsSearch.value = state.achievementsUi.query;
+  }
+}
+
+function renderAchievementsPanel() {
+  renderAchievementsSummary(state.achievements);
+  renderAchievements(state.achievements, el.achievements, {
+    compact: false,
+    filter: state.achievementsUi.filter,
+    sort: state.achievementsUi.sort,
+    query: state.achievementsUi.query,
+  });
+  renderAchievements(state.achievements, el.summaryAchievements, {
+    compact: true,
+    limit: 3,
+    sort: "progress",
+  });
 }
 
 function renderTopCategories(items) {
@@ -753,8 +1019,7 @@ function renderTopCategories(items) {
 }
 
 function renderRiskWidget(dashboard) {
-  const warningKey = String(dashboard.warning_key || "").trim();
-  const warning = warningKey ? t(warningKey) : String(dashboard.warning || "").trim();
+  const warning = resolveWarningText(dashboard);
   const todayLimit = Number(dashboard.today_limit || 0);
   const forecast = Number(dashboard.month_end_forecast || 0);
   const days = Number(dashboard.days_to_stipend || 0);
@@ -796,8 +1061,7 @@ function renderGoalWidget(dashboard) {
 }
 
 function renderWarningsAndEmptyState(transactions, dashboard) {
-  const warningKey = String(dashboard.warning_key || "").trim();
-  const warningText = warningKey ? t(warningKey) : String(dashboard.warning || "").trim();
+  const warningText = resolveWarningText(dashboard);
   const warningStatus = String(dashboard.warning_status || "").trim() || "success";
   const allowedStatuses = new Set(["info", "success", "warning", "danger"]);
   const statusClass = allowedStatuses.has(warningStatus) ? warningStatus : "success";
@@ -1104,8 +1368,8 @@ async function refreshDashboard() {
   renderTopCategories(state.categories);
   hydrateHistoryFromDashboard(transactions);
   renderTransactions(state.transactions, el.summaryTxList, 5);
-  renderAchievements(state.achievements, el.achievements);
-  renderAchievements(state.achievements, el.summaryAchievements, true, 3);
+  syncAchievementControls();
+  renderAchievementsPanel();
   renderAdvancedAnalytics();
   drawBars(el.categoryChart, state.categories);
   drawLine(el.timelineChart, state.timeline);
@@ -1266,8 +1530,8 @@ window.addEventListener("warkla:langchange", () => {
     updateHistoryCategoryOptions();
     renderHistoryList();
     renderTransactions(state.transactions, el.summaryTxList, 5);
-    renderAchievements(state.achievements, el.achievements);
-    renderAchievements(state.achievements, el.summaryAchievements, true, 3);
+    syncAchievementControls();
+    renderAchievementsPanel();
     renderAdvancedAnalytics();
     drawBars(el.categoryChart, state.categories);
     drawLine(el.timelineChart, state.timeline);
@@ -1321,6 +1585,37 @@ if (el.historyLoadMoreBtn) {
 if (el.historyRetryBtn) {
   el.historyRetryBtn.addEventListener("click", async () => {
     await loadHistoryPage(Math.max(1, state.history.page), false);
+  });
+}
+
+if (el.achievementsFilter) {
+  el.achievementsFilter.addEventListener("change", () => {
+    state.achievementsUi.filter = el.achievementsFilter.value;
+    renderAchievementsPanel();
+  });
+}
+
+if (el.achievementsSort) {
+  el.achievementsSort.addEventListener("change", () => {
+    state.achievementsUi.sort = el.achievementsSort.value;
+    renderAchievementsPanel();
+  });
+}
+
+if (el.achievementsSearch) {
+  el.achievementsSearch.addEventListener("input", () => {
+    state.achievementsUi.query = el.achievementsSearch.value.trim();
+    renderAchievementsPanel();
+  });
+}
+
+if (el.achievementsClearFilters) {
+  el.achievementsClearFilters.addEventListener("click", () => {
+    state.achievementsUi.filter = "all";
+    state.achievementsUi.sort = "progress";
+    state.achievementsUi.query = "";
+    syncAchievementControls();
+    renderAchievementsPanel();
   });
 }
 
@@ -1467,6 +1762,7 @@ window.addEventListener("resize", () => {
   renderTemplateLists();
   closeAddOverlay();
   el.profileAvatarMini.src = defaultAvatarDataUrl();
+  syncAchievementControls();
   setView("summary");
 
   try {

@@ -208,8 +208,34 @@
         </article>
 
         <article id="achievements-menu" class="card achievements-card" data-view-item="achievements">
-          <h2 data-i18n="achievements">Achievements</h2>
-          <div id="achievements" class="badges"></div>
+          <div class="section-head achievements-head">
+            <div>
+              <h2 data-i18n="achievements">Achievements</h2>
+              <p class="subhead achievements-subhead" data-i18n="achievements_sub">Track progress and stay motivated</p>
+            </div>
+            <button id="achievementsClearFilters" type="button" class="ghost" data-i18n="achievements_clear_filters">Reset view</button>
+          </div>
+
+          <div class="achievements-summary" id="achievementsSummaryStats" aria-live="polite"></div>
+
+          <div class="achievements-toolbar" role="group" aria-label="Achievements controls">
+            <div class="achievements-toolbar-row">
+              <select id="achievementsFilter" class="history-select" aria-label="Achievement state filter">
+                <option value="all" data-i18n="achievements_filter_all">All</option>
+                <option value="unlocked" data-i18n="achievements_filter_unlocked">Unlocked</option>
+                <option value="in-progress" data-i18n="achievements_filter_in_progress">In progress</option>
+                <option value="locked" data-i18n="achievements_filter_locked">Locked</option>
+              </select>
+              <select id="achievementsSort" class="history-select" aria-label="Achievement sort">
+                <option value="progress" data-i18n="achievements_sort_progress">By progress</option>
+                <option value="recent" data-i18n="achievements_sort_recent">Recently unlocked</option>
+                <option value="title" data-i18n="achievements_sort_title">By title</option>
+              </select>
+            </div>
+            <input id="achievementsSearch" type="search" class="history-search" data-i18n-placeholder="achievements_search_placeholder" placeholder="Find achievement" aria-label="Search achievements" />
+          </div>
+
+          <div id="achievements" class="badges achievements-list" role="list"></div>
         </article>
       </div>
     </section>
