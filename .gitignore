@@ -1,0 +1,16 @@
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+.venv/
+venv/
+.env
+.instance/
+*.db
+*.sqlite
+uploads/*
+!uploads/.gitkeep
+migrations/__pycache__/
+.pytest_cache/
+console.log();

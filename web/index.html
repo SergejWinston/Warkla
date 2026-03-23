@@ -1,0 +1,250 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Warkla</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Bungee&family=Manrope:wght@400;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <div class="scene"></div>
+  <header class="topbar">
+    <div class="brand">
+      <div class="pixel-cat" aria-hidden="true">
+        <span></span><span></span><span></span>
+      </div>
+      <h1>Warkla</h1>
+    </div>
+    <button id="navToggleBtn" class="menu-toggle ghost" type="button" aria-controls="mainNav" aria-expanded="false">
+      <span data-i18n="menu">Menu</span>
+    </button>
+    <nav id="mainNav" class="main-nav" aria-label="Main menu">
+      <a href="#" data-view-link="summary" class="active" data-i18n="menu_summary">Summary</a>
+      <a href="#" data-view-link="analytics" data-i18n="menu_analytics">Analytics</a>
+      <a href="#" data-view-link="history" data-i18n="menu_history">History</a>
+      <a href="#" data-view-link="achievements" data-i18n="menu_achievements">Achievements</a>
+    </nav>
+    <div class="topbar-controls">
+      <label class="lang-select-wrap" data-i18n="lang_label">Language</label>
+      <select class="lang-select" data-lang-select>
+        <option value="en">EN</option>
+        <option value="ru">RU</option>
+      </select>
+      <div class="profile-anchor">
+        <button id="profileToggleBtn" class="profile-toggle" type="button" aria-controls="profilePopover" aria-expanded="false">
+          <img id="profileAvatarMini" class="avatar-mini" alt="Avatar" src="" />
+        </button>
+        <section id="profilePopover" class="profile-popover" hidden aria-label="Profile settings">
+          <div class="profile-popover-head">
+            <h2 data-i18n="profile_settings">Profile settings</h2>
+            <button id="profileCloseBtn" class="profile-close" type="button" aria-label="Close">x</button>
+          </div>
+          <div class="profile-top">
+            <img id="profileAvatar" class="avatar" alt="Avatar" src="" />
+            <div class="profile-meta">
+              <label for="avatarInput" data-i18n="avatar">Avatar</label>
+              <input id="avatarInput" type="file" accept="image/png,image/jpeg,image/webp" />
+              <button id="avatarUploadBtn" class="ghost" type="button" data-i18n="upload_avatar">Upload avatar</button>
+            </div>
+          </div>
+          <form id="profileForm">
+            <div class="row">
+              <label for="profileUsername" data-i18n="username">Username</label>
+              <input id="profileUsername" type="text" required />
+            </div>
+            <div class="row">
+              <label for="profileStipendDay" data-i18n="stipend_day">Stipend day (1-31)</label>
+              <input id="profileStipendDay" type="number" min="1" max="31" required />
+            </div>
+            <button class="primary" type="submit" data-i18n="save_profile">Save profile</button>
+          </form>
+          <p id="profileMsg" class="msg"></p>
+        </section>
+      </div>
+      <button id="logoutBtn" class="ghost" hidden data-i18n="logout">Logout</button>
+    </div>
+  </header>
+
+  <main class="layout">
+    <section id="appPanel">
+      <div class="grid">
+        <article id="summary" class="card metrics summary-main" data-view-item="summary">
+          <div class="section-head">
+            <h2 data-i18n="today">Today</h2>
+            <p class="subhead" data-i18n="summary_sub">Your financial pulse in one glance</p>
+          </div>
+          <div class="kpis">
+            <div><span data-i18n="balance">Balance</span><strong id="kpiBalance">0</strong></div>
+            <div><span data-i18n="days_to_stipend">Days to stipend</span><strong id="kpiStipend">0</strong></div>
+            <div><span data-i18n="safe_spend_today">Safe spend today</span><strong id="kpiLimit">0</strong></div>
+            <div><span data-i18n="month_forecast">Month forecast</span><strong id="kpiForecast">0</strong></div>
+          </div>
+          <div id="warningBox" class="status-banner" hidden role="status" aria-live="polite" aria-atomic="true">
+            <p id="warning" class="warning"></p>
+          </div>
+          <div id="emptyState" class="empty-state" hidden>
+            <h3 data-i18n="empty_title">Start your budget journey</h3>
+            <p data-i18n="empty_desc">Add your first transaction and unlock insights, forecasts, and achievements.</p>
+            <button id="emptyStateAddBtn" class="primary" type="button" data-i18n="add_first_transaction">Add first transaction</button>
+          </div>
+        </article>
+
+        <article class="card widgets-card" data-view-item="summary">
+          <div class="section-head">
+            <h2 data-i18n="widgets_title">Smart widgets</h2>
+            <p class="subhead" data-i18n="widgets_sub">Actionable tips based on your current data</p>
+          </div>
+          <div class="widgets-grid">
+            <section id="goalWidget" class="widget goal-widget">
+              <h3 data-i18n="goal_title">Savings goal</h3>
+              <p id="goalText" class="widget-note"></p>
+              <div class="goal-progress" aria-hidden="true">
+                <div id="goalProgressFill" class="goal-progress-fill"></div>
+              </div>
+              <form id="goalForm" class="inline-form">
+                <label for="goalInput" data-i18n="goal_target">Target amount</label>
+                <input id="goalInput" type="number" min="1" step="1" />
+                <button class="ghost" type="submit" data-i18n="set_goal">Set goal</button>
+              </form>
+            </section>
+
+            <section class="widget risk-widget">
+              <h3 data-i18n="risk_title">Budget risk</h3>
+              <p id="riskText" class="widget-note"></p>
+              <ul id="riskHints" class="hint-list"></ul>
+            </section>
+
+            <section class="widget categories-widget">
+              <h3 data-i18n="top_categories">Top categories</h3>
+              <div id="topCategories" class="categories-board"></div>
+            </section>
+
+            <section class="widget actions-widget">
+              <h3 data-i18n="quick_actions">Quick actions</h3>
+              <div class="quick-actions">
+                <button type="button" class="ghost" data-quick-action="coffee" data-i18n="action_coffee">Coffee expense</button>
+                <button type="button" class="ghost" data-quick-action="transport" data-i18n="action_transport">Transport expense</button>
+                <button type="button" class="ghost" data-quick-action="income" data-i18n="action_income">Add income</button>
+              </div>
+            </section>
+          </div>
+        </article>
+
+        <article class="card tx-list-card preview-card" data-view-item="summary">
+          <div class="section-head">
+            <h2 data-i18n="recent_transactions">Recent transactions</h2>
+            <button id="goHistoryBtn" type="button" class="ghost" data-i18n="view_all">View all</button>
+          </div>
+          <div id="summaryTxList" class="tx-list compact"></div>
+        </article>
+
+        <article class="card achievements-card preview-card" data-view-item="summary">
+          <div class="section-head">
+            <h2 data-i18n="achievements">Achievements</h2>
+            <button id="goAchievementsBtn" type="button" class="ghost" data-i18n="view_all">View all</button>
+          </div>
+          <div id="summaryAchievements" class="badges compact"></div>
+        </article>
+
+        <article id="analytics" class="card chart-card" data-view-item="analytics">
+          <h2 data-i18n="category_split">Category split</h2>
+          <canvas id="categoryChart" width="540" height="260"></canvas>
+        </article>
+
+        <article class="card chart-card" data-view-item="analytics">
+          <h2 data-i18n="balance_timeline">Balance timeline</h2>
+          <canvas id="timelineChart" width="540" height="260"></canvas>
+        </article>
+
+        <article class="card chart-card" data-view-item="analytics">
+          <h2 data-i18n="analytics_stats_title">Period stats</h2>
+          <div id="analyticsStats" class="analytics-metrics"></div>
+        </article>
+
+        <article class="card chart-card" data-view-item="analytics">
+          <h2 data-i18n="analytics_insights_title">Insights</h2>
+          <div id="analyticsInsights" class="analytics-insights"></div>
+        </article>
+
+        <article id="transactions" class="card tx-list-card" data-view-item="history">
+          <h2 data-i18n="recent_transactions">Recent transactions</h2>
+          <div id="txList" class="tx-list"></div>
+        </article>
+
+        <article id="achievements-menu" class="card achievements-card" data-view-item="achievements">
+          <h2 data-i18n="achievements">Achievements</h2>
+          <div id="achievements" class="badges"></div>
+        </article>
+      </div>
+    </section>
+  </main>
+
+  <div id="addOverlayBackdrop" class="overlay-backdrop" hidden></div>
+  <section id="addOverlay" class="card add-overlay" hidden aria-modal="true" role="dialog" aria-labelledby="addOverlayTitle">
+    <div class="add-overlay-head">
+      <h2 id="addOverlayTitle" data-i18n="add_transaction">Add transaction</h2>
+      <button id="addOverlayCloseBtn" class="ghost" type="button" aria-label="Close">x</button>
+    </div>
+
+    <div id="templatesPanel" class="templates-panel">
+      <h3 data-i18n="templates_title">Templates</h3>
+      <p class="sub" data-i18n="templates_sub">Use a preset or create your own</p>
+      <div id="builtinTemplates" class="template-list"></div>
+
+      <div class="template-create">
+        <label for="templateNameInput" data-i18n="template_name">Template name</label>
+        <div class="template-create-row">
+          <input id="templateNameInput" type="text" maxlength="40" placeholder="my template" data-i18n-placeholder="template_name" />
+          <button id="saveTemplateBtn" class="ghost" type="button" data-i18n="save_template">Save template</button>
+        </div>
+      </div>
+
+      <div id="customTemplates" class="template-list"></div>
+    </div>
+
+    <form id="txForm">
+      <div class="row">
+        <label for="txType" data-i18n="type">Type</label>
+        <select id="txType">
+          <option value="expense" data-i18n="type_expense">Expense</option>
+          <option value="income" data-i18n="type_income">Income</option>
+        </select>
+      </div>
+      <div class="row">
+        <label for="txAmount" data-i18n="amount">Amount</label>
+        <input id="txAmount" type="number" min="0.01" step="0.01" required />
+        <small id="txAmountHint" class="field-hint" data-i18n="amount_hint">Enter amount greater than 0</small>
+      </div>
+      <div class="row">
+        <label for="txCategory" data-i18n="category">Category</label>
+        <input id="txCategory" type="text" placeholder="food" data-i18n-placeholder="placeholder_category" />
+      </div>
+      <div class="row">
+        <label for="txSource" data-i18n="source">Source</label>
+        <input id="txSource" type="text" placeholder="scholarship" data-i18n-placeholder="placeholder_source" />
+      </div>
+      <div class="row">
+        <label for="txDate" data-i18n="date">Date</label>
+        <input id="txDate" type="date" />
+      </div>
+      <div class="row">
+        <label for="txNote" data-i18n="note">Note</label>
+        <input id="txNote" type="text" maxlength="255" />
+      </div>
+      <button class="primary" type="submit" data-i18n="save">Save</button>
+    </form>
+
+  </section>
+
+  <button id="floatingAddBtn" class="floating-add-btn" type="button" aria-label="Add transaction">
+    <span class="fab-plus" aria-hidden="true">+</span>
+    <span class="fab-label" data-fab-label hidden></span>
+  </button>
+
+  <script src="/i18n.js" defer></script>
+  <script src="/app.js" defer></script>
+</body>
+</html>
