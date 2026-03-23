@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from sqlalchemy import func
+from sqlalchemy.exc import IntegrityError
 
 from app.extensions import db
 from app.models import Achievement, Transaction, UserAchievement
@@ -103,10 +104,13 @@ DEFAULT_ACHIEVEMENTS = [
 
 def seed_achievements() -> None:
     for item in DEFAULT_ACHIEVEMENTS:
-        exists = Achievement.query.filter_by(key=item["key"]).first()
-        if exists:
+        try:
+            with db.session.begin_nested():
+                db.session.add(Achievement(**item))
+                db.session.flush()
+        except IntegrityError:
+            # Skip duplicates if another process/session inserted the same key.
             continue
-        db.session.add(Achievement(**item))
     db.session.commit()
 
 
