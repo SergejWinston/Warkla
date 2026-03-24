@@ -1,0 +1,281 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Warkla - Как запустить проект</title>
+    <style>
+      :root {
+        --bg: #f8f5ef;
+        --paper: #fffdf8;
+        --ink: #1f1f1f;
+        --muted: #5c5c5c;
+        --brand: #0f766e;
+        --brand-2: #f59e0b;
+        --line: #e7decf;
+        --ok: #0f766e;
+        --warn: #b45309;
+        --shadow: 0 14px 30px rgba(31, 31, 31, 0.08);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html {
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
+        text-rendering: optimizeLegibility;
+      }
+
+      body {
+        margin: 0;
+        font-family: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+        color: var(--ink);
+        background:
+          radial-gradient(circle at 8% 15%, rgba(15, 118, 110, 0.12), transparent 35%),
+          radial-gradient(circle at 90% 0%, rgba(245, 158, 11, 0.14), transparent 30%),
+          var(--bg);
+      }
+
+      .wrap {
+        width: min(1040px, calc(100% - 32px));
+        margin: 0 auto;
+        padding: 28px 0 56px;
+      }
+
+      .hero {
+        border: 1px solid var(--line);
+        background: linear-gradient(145deg, #fffefb, #fff7eb);
+        box-shadow: var(--shadow);
+        border-radius: 18px;
+        padding: 24px;
+        margin-bottom: 20px;
+      }
+
+      .kicker {
+        margin: 0;
+        color: var(--brand);
+        font-weight: 700;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        font-size: 12px;
+      }
+
+      h1 {
+        margin: 8px 0 10px;
+        line-height: 1.15;
+        font-size: clamp(28px, 4vw, 42px);
+      }
+
+      .hero p {
+        margin: 0;
+        color: var(--muted);
+        max-width: 72ch;
+      }
+
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(12, 1fr);
+        gap: 16px;
+      }
+
+      .card {
+        grid-column: span 12;
+        border: 1px solid var(--line);
+        background: var(--paper);
+        border-radius: 16px;
+        padding: 20px;
+        box-shadow: var(--shadow);
+      }
+
+      .card.half {
+        grid-column: span 6;
+      }
+
+      h2 {
+        margin: 0 0 12px;
+        font-size: 24px;
+      }
+
+      h3 {
+        margin: 0 0 10px;
+        font-size: 18px;
+      }
+
+      p,
+      li {
+        color: #333;
+        line-height: 1.6;
+      }
+
+      ul,
+      ol {
+        margin: 0;
+        padding-left: 20px;
+      }
+
+      code {
+        font-family: "JetBrains Mono", "Fira Code", monospace;
+        font-size: 0.92em;
+      }
+
+      .chips {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+
+      .chip {
+        padding: 6px 10px;
+        border-radius: 999px;
+        border: 1px solid var(--line);
+        background: #fff;
+        font-size: 13px;
+      }
+
+      .chip.ok {
+        border-color: rgba(15, 118, 110, 0.35);
+        color: var(--ok);
+      }
+
+      .chip.warn {
+        border-color: rgba(180, 83, 9, 0.35);
+        color: var(--warn);
+      }
+
+      pre {
+        margin: 0;
+        background: #161818;
+        color: #e8f7f6;
+        padding: 14px;
+        border-radius: 12px;
+        overflow-x: auto;
+        border: 1px solid #2f3c3b;
+      }
+
+      .muted {
+        color: var(--muted);
+      }
+
+      .reveal {
+        opacity: 0;
+        transform: translateY(14px);
+        animation: revealUp 0.55s ease forwards;
+      }
+
+      .delay-1 {
+        animation-delay: 70ms;
+      }
+
+      .delay-2 {
+        animation-delay: 140ms;
+      }
+
+      .delay-3 {
+        animation-delay: 210ms;
+      }
+
+      .delay-4 {
+        animation-delay: 280ms;
+      }
+
+      @keyframes revealUp {
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+
+      @media (max-width: 900px) {
+        .card.half {
+          grid-column: span 12;
+        }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        *,
+        *::before,
+        *::after {
+          animation: none !important;
+          transition: none !important;
+          scroll-behavior: auto !important;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="wrap">
+      <section class="hero reveal">
+        <p class="kicker">Warkla / Build Guide</p>
+        <h1>Публичная страница запуска проекта</h1>
+        <p>
+          Адрес страницы: <strong>/how_build</strong>. Эта страница доступна всем без авторизации и помогает быстро поднять
+          проект локально или через Docker.
+        </p>
+      </section>
+
+      <section class="grid">
+        <article class="card half reveal delay-1">
+          <h2>Быстрый локальный старт</h2>
+          <div class="chips" style="margin-bottom: 12px">
+            <span class="chip">Python 3.10+</span>
+            <span class="chip">Flask</span>
+            <span class="chip">SQLite</span>
+          </div>
+          <pre><code>cd /home/sneroff/projects/Warkla
+python -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+python run.py</code></pre>
+          <p class="muted" style="margin-top: 10px">Открой: <code>http://localhost:5000</code></p>
+        </article>
+
+        <article class="card half reveal delay-2">
+          <h2>Docker запуск</h2>
+          <h3>1. Получить образ</h3>
+          <pre><code>docker pull ghcr.io/sergejwinston/warkla</code></pre>
+          <h3 style="margin-top: 12px">2. Запустить контейнер</h3>
+          <pre><code>docker run -d \
+  --name warkla \
+  -p 5000:5000 \
+  -e SECRET_KEY='change-me' \
+  -e JWT_SECRET_KEY='change-me-too' \
+  -e DATABASE_URL='sqlite:////app/data/warkla.db' \
+  -e UPLOAD_FOLDER='/app/data/uploads' \
+  -v $(pwd)/data:/app/data \
+  ghcr.io/sergejwinston/warkla</code></pre>
+        </article>
+
+        <article class="card reveal delay-3">
+          <h2>Проверка после старта</h2>
+          <ol>
+            <li>Открывается <code>http://localhost:5000</code>.</li>
+            <li>Доступны страницы <code>/login</code> и <code>/register</code>.</li>
+            <li>Регистрация и вход возвращают JWT.</li>
+            <li>Транзакции создаются и отображаются.</li>
+          </ol>
+        </article>
+
+        <article class="card reveal delay-4">
+          <h2>Анимации и пиксели</h2>
+          <p>
+            Для приятного UX используем мягкие появления блоков и уважаем настройки доступности через
+            <code>prefers-reduced-motion</code>.
+          </p>
+          <ul>
+            <li>Размерная сетка: шаг 4px/8px.</li>
+            <li>Иконки и картинки: 2x-ассеты для Retina.</li>
+            <li>Границы: 1px, без случайных дробных значений.</li>
+            <li>Проверка на ширинах: 360px, 768px, 1280px.</li>
+          </ul>
+          <div class="chips" style="margin-top: 12px">
+            <span class="chip ok">Плавно</span>
+            <span class="chip ok">Четко по пикселям</span>
+            <span class="chip warn">Без перегруза анимациями</span>
+          </div>
+        </article>
+      </section>
+    </main>
+  </body>
+</html>

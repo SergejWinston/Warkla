@@ -94,6 +94,10 @@ def create_app(config_name: str | None = None) -> Flask:
     def register_page():
         return send_from_directory(web_dir, "register.html")
 
+    @app.get("/how_build")
+    def how_build_page():
+        return send_from_directory(web_dir, "how_build.html")
+
     @app.get("/<path:path>")
     def static_proxy(path: str):
         target = web_dir / path

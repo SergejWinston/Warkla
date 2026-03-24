@@ -1,33 +1,102 @@
 # Warkla
 
-Warkla - это веб-приложение для учета личных финансов: доходы/расходы, дашборд бюджета, аналитика, история операций, достижения и профиль пользователя.
+Тема проекта: трекер расхода денег для студента.
 
-## Возможности
+Warkla - это MVP веб-сервис для учета личных финансов, который помогает дожить от стипендии до стипендии без долгов: фиксирует доходы/расходы, прогнозирует остаток бюджета, показывает финансовые риски и добавляет мотивацию через достижения.
 
-- Регистрация и вход по JWT
-- Добавление, просмотр и удаление транзакций
-- Загрузка чеков к транзакциям (jpg/jpeg/png/webp)
-- Дашборд: баланс, безопасный лимит на день, прогноз до конца месяца
-- Аналитика: категории, таймлайн, статистика, сравнение периодов, аномалии
-- Достижения с прогрессом
-- Профиль: имя, день стипендии, аватар
-- Web UI на чистом HTML/CSS/JS (без отдельного frontend-сервера)
+## 1. Цель и сценарий использования
 
-## Технологии
+Пользователь ежедневно вносит транзакции:
+- доходы: стипендия, работа, подработка, помощь родителей;
+- расходы: еда, транспорт, развлечения, учеба, связь и т.д.
 
-- Python 3.10+
-- Flask
-- Flask-SQLAlchemy
-- Flask-Migrate
-- Flask-JWT-Extended
-- SQLite (по умолчанию)
+Сервис рассчитывает:
+- текущий баланс;
+- безопасный лимит на сегодня;
+- дни до следующей стипендии;
+- прогноз на конец месяца;
+- предупреждения о риске финансовой ямы.
 
-## Быстрый старт
+## 2. Соответствие требованиям задания
 
-1. Клонируйте репозиторий и перейдите в папку проекта.
-2. Создайте и активируйте виртуальное окружение.
-3. Установите зависимости.
-4. Запустите приложение.
+1. Учет доходов/расходов
+- Реализовано добавление доходов с источником, датой, валютой.
+- Реализовано добавление расходов с категорией, датой, заметкой, флагом скидки.
+
+2. Прогнозирование и аналитика
+- Реализован прогноз остатка на конец месяца.
+- Реализованы данные для круговой диаграммы расходов по категориям.
+- Реализованы данные для линейного графика динамики баланса.
+
+3. Геймификация и уведомления
+- Реализована система достижений с прогрессом.
+- Реализованы статусные бюджетные предупреждения (danger/warning/info/success) и текстовые подсказки.
+
+4. Дашборд «Финансовое здоровье»
+- Текущий баланс.
+- Дней до стипендии.
+- Сколько можно потратить сегодня.
+- Прогноз на конец месяца (успех/риск).
+
+5. Инспектор транзакций
+- Лента операций с фильтрацией по дате, категории и типу.
+- Детали операции по ID.
+- Загрузка и просмотр фото чека.
+
+## 3. Технический стек
+
+- Backend: Flask, Flask-SQLAlchemy, Flask-Migrate, Flask-JWT-Extended, Flask-Cors.
+- Frontend: HTML/CSS/JavaScript (статическая SPA-подобная клиентская часть без отдельного node-сервера).
+- БД: SQLite по умолчанию (можно переопределить через `DATABASE_URL`).
+- Отчеты: CSV и PDF (reportlab).
+- Runtime: Python 3.11+, Gunicorn (в Docker).
+
+## 4. Архитектура
+
+- `app/__init__.py`: app factory, конфигурация, инициализация расширений, регистрация blueprints, глобальные обработчики ошибок.
+- `app/models.py`: модели `User`, `Transaction`, `Achievement`, `UserAchievement`, `UserProfile`.
+- `app/routes/*`: REST API (auth, transactions, dashboard/analytics, achievements, profile).
+- `app/services/*`: аналитика, бюджетные метрики, логика достижений.
+- `web/*`: клиентские страницы и JS-логика.
+
+При старте приложения:
+- создаются таблицы (`db.create_all()`),
+- выполняется сидирование достижений,
+- применяется защитная донастройка схемы для поля `currency` в `transactions`.
+
+## 5. Структура репозитория
+
+```text
+app/
+  routes/
+  services/
+  config.py
+  extensions.py
+  models.py
+  __init__.py
+web/
+  index.html
+  login.html
+  register.html
+  app.js
+  styles.css
+migrations/
+deploy/
+uploads/
+run.py
+requirements.txt
+Dockerfile
+```
+
+## 6. Локальный запуск
+
+### 6.1 Требования
+
+- Linux/macOS/WSL
+- Python 3.11+
+- pip
+
+### 6.2 Установка и старт
 
 ```bash
 python -m venv .venv
@@ -36,32 +105,39 @@ pip install -r requirements.txt
 python run.py
 ```
 
-После запуска приложение будет доступно по адресу:
+Приложение будет доступно на `http://localhost:5000`.
 
-- http://localhost:5000
+Основные страницы:
+- `/` - приложение;
+- `/login` - вход;
+- `/register` - регистрация;
+- `/how_build` - описание сборки/архитектуры.
 
-Страницы:
+## 7. Запуск в Docker
 
-- `/` - основное приложение
-- `/login` - вход
-- `/register` - регистрация
+```bash
+docker build -t warkla:latest .
+docker run --rm -p 5000:5000 --name warkla warkla:latest
+```
 
-## Переменные окружения
+Контейнер стартует через Gunicorn (`run:app`) и слушает порт `5000`.
 
-Можно задать через `.env` или переменные окружения системы.
+## 8. Конфигурация окружения
 
-| Переменная | По умолчанию | Описание |
+Поддерживается настройка через системные переменные или `.env`.
+
+| Переменная | Значение по умолчанию | Назначение |
 | --- | --- | --- |
-| `FLASK_ENV` | `development` | Режим конфигурации (`development`/`testing`) |
-| `SECRET_KEY` | `dev-secret-key` | Flask secret key |
-| `JWT_SECRET_KEY` | `dev-jwt-secret` | Ключ подписи JWT |
-| `JWT_ACCESS_TOKEN_EXPIRES_DAYS` | `30` | Срок жизни access token в днях |
-| `DATABASE_URL` | `sqlite:///.../warkla.db` | URL базы данных SQLAlchemy |
-| `CORS_ORIGINS` | `*` | CORS для `/api/*` |
-| `UPLOAD_FOLDER` | `uploads` | Каталог для загрузок (чеки, аватары) |
-| `MAX_CONTENT_LENGTH` | `5242880` | Максимальный размер файла в байтах (по умолчанию 5MB) |
+| `FLASK_ENV` | `development` | Профиль конфигурации (`development` / `testing`) |
+| `SECRET_KEY` | `dev-secret-key` | Секрет Flask-сессий |
+| `JWT_SECRET_KEY` | `dev-jwt-secret` | Секрет подписи JWT |
+| `JWT_ACCESS_TOKEN_EXPIRES_DAYS` | `30` | TTL access token (дни) |
+| `DATABASE_URL` | `sqlite:///.../warkla.db` | SQLAlchemy DSN |
+| `CORS_ORIGINS` | `*` | Разрешенные origin для `/api/*` |
+| `UPLOAD_FOLDER` | `uploads` | Хранилище чеков и аватаров |
+| `MAX_CONTENT_LENGTH` | `5242880` | Максимальный размер upload (байт) |
 
-Пример `.env`:
+Пример:
 
 ```env
 FLASK_ENV=development
@@ -74,10 +150,9 @@ UPLOAD_FOLDER=uploads
 MAX_CONTENT_LENGTH=5242880
 ```
 
-## API (кратко)
+## 9. REST API
 
-Базовые префиксы:
-
+Базовые группы:
 - `/api/auth`
 - `/api/transactions`
 - `/api/dashboard`
@@ -85,21 +160,31 @@ MAX_CONTENT_LENGTH=5242880
 - `/api/achievements`
 - `/api/profile`
 
-### Auth
+### 9.1 Auth
 
 - `POST /api/auth/register`
 - `POST /api/auth/login`
 
-### Transactions
+Ответ содержит `access_token`.
 
-- `POST /api/transactions`
-- `GET /api/transactions`
-- `GET /api/transactions/<id>`
-- `DELETE /api/transactions/<id>`
-- `POST /api/transactions/<id>/receipt`
-- `GET /api/transactions/<id>/receipt`
+### 9.2 Transactions
 
-### Dashboard и Analytics
+- `POST /api/transactions` - создать транзакцию.
+- `GET /api/transactions` - список с пагинацией (`page`, `per_page<=100`) и фильтрами (`date_from`, `date_to`, `category`, `type`).
+- `GET /api/transactions/<id>` - детальная карточка.
+- `PATCH /api/transactions/<id>` - обновление.
+- `DELETE /api/transactions/<id>` - удаление.
+- `POST /api/transactions/<id>/receipt` - загрузка чека.
+- `GET /api/transactions/<id>/receipt` - просмотр чека.
+- `GET /api/transactions/export?format=csv|pdf` - экспорт.
+
+Ограничения:
+- `type`: `income` или `expense`.
+- `currency`: `RUB` или `USD`.
+- Для `expense` обязательна корректная категория: `food`, `transport`, `entertainment`, `study`, `communication`, `health`, `housing`, `other`.
+- Чеки: `jpg/jpeg/png/webp`.
+
+### 9.3 Dashboard и Analytics
 
 - `GET /api/dashboard`
 - `GET /api/analytics/categories`
@@ -111,61 +196,86 @@ MAX_CONTENT_LENGTH=5242880
 - `GET /api/analytics/category/<category>/timeline`
 - `GET /api/analytics/anomalies?lookback=90`
 
-### Achievements
+### 9.4 Achievements
 
 - `GET /api/achievements`
 
-### Profile
+### 9.5 Profile
 
 - `GET /api/profile`
 - `PATCH /api/profile`
 - `POST /api/profile/avatar`
 
-## Авторизация
+## 10. Авторизация
 
-Большинство API (кроме `/api/auth/*`) требуют JWT:
+Все API, кроме `POST /api/auth/register` и `POST /api/auth/login`, требуют JWT:
 
 ```http
 Authorization: Bearer <access_token>
 ```
 
-Токен возвращается в ответах `register` и `login`.
+## 11. Примеры запросов (curl)
 
-## Миграции и БД
-
-- При старте приложения вызывается `db.create_all()` и сидирование достижений.
-- Папка `migrations/` присутствует и может использоваться для Flask-Migrate.
-
-Пример команд миграций:
+Регистрация:
 
 ```bash
-flask db init
-flask db migrate -m "init"
+curl -X POST http://localhost:5000/api/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{"username":"student1","email":"student1@example.com","password":"123456"}'
+```
+
+Логин:
+
+```bash
+curl -X POST http://localhost:5000/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"student1@example.com","password":"123456"}'
+```
+
+Создание расхода:
+
+```bash
+curl -X POST http://localhost:5000/api/transactions \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer <TOKEN>" \
+  -d '{"type":"expense","amount":450,"currency":"RUB","category":"food","date":"2026-03-24","note":"Обед"}'
+```
+
+Дашборд:
+
+```bash
+curl -X GET http://localhost:5000/api/dashboard \
+  -H "Authorization: Bearer <TOKEN>"
+```
+
+## 12. База данных и миграции
+
+- По умолчанию используется SQLite файл `warkla.db` в корне проекта.
+- Для управляемых изменений схемы используется Flask-Migrate (Alembic).
+
+Пример:
+
+```bash
+flask db migrate -m "add new field"
 flask db upgrade
 ```
 
-## Структура проекта
+Важно: в проекте уже есть рабочий каталог `migrations/`.
 
-```text
-app/
-  routes/        # REST endpoints
-  services/      # бизнес-логика аналитики/достижений
-  models.py      # SQLAlchemy модели
-  config.py      # конфигурация
-  __init__.py    # app factory + регистрация blueprint
-web/             # статический frontend (HTML/CSS/JS)
-uploads/         # загруженные файлы пользователей
-migrations/      # миграции БД
-run.py           # точка запуска
-requirements.txt # зависимости
-```
+## 13. Что предоставить жюри
 
-## Полезно для разработки
+1. Рабочий прототип
+- Запущенный сервис по локальному URL или на хостинге.
 
-- Максимальный `per_page` для списка транзакций: `100`.
-- Поддерживаемые форматы файлов: `.jpg`, `.jpeg`, `.png`, `.webp`.
-- В тестовом режиме используется in-memory SQLite (`sqlite:///:memory:`).
+2. Исходный код
+- Репозиторий с коммитами и инструкцией запуска.
 
-## Лицензия
+3. Краткая документация
+- Данный README (архитектура, запуск, API, конфигурация, ограничения).
 
-Добавьте информацию о лицензии при необходимости.
+## 14. Дорожная карта (следующий шаг)
+
+- Telegram-бот как дополнительный интерфейс ввода транзакций.
+- Push/чат-уведомления с персонализацией.
+- Расширение валют и динамические курсы.
+- Тесты (unit/integration/e2e) и CI-пайплайн.

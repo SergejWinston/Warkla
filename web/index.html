@@ -12,12 +12,12 @@
 <body>
   <div class="scene"></div>
   <header class="topbar">
-    <div class="brand">
+    <a href="#" class="brand" data-view-link="summary" aria-label="Go to summary">
       <div class="pixel-cat" aria-hidden="true">
         <span></span><span></span><span></span>
       </div>
       <h1>Warkla</h1>
-    </div>
+    </a>
     <button id="navToggleBtn" class="menu-toggle ghost" type="button" aria-controls="mainNav" aria-expanded="false">
       <span data-i18n="menu">Menu</span>
     </button>
@@ -26,13 +26,16 @@
       <a href="#" data-view-link="analytics" data-i18n="menu_analytics">Analytics</a>
       <a href="#" data-view-link="history" data-i18n="menu_history">History</a>
       <a href="#" data-view-link="achievements" data-i18n="menu_achievements">Achievements</a>
+      <div id="mainNavExtras" class="main-nav-extras"></div>
     </nav>
-    <div class="topbar-controls">
-      <label class="lang-select-wrap" data-i18n="lang_label">Language</label>
-      <select class="lang-select" data-lang-select>
-        <option value="en">EN</option>
-        <option value="ru">RU</option>
-      </select>
+    <div id="topbarControls" class="topbar-controls">
+      <div id="langControlGroup" class="lang-control-group">
+        <label class="lang-select-wrap" data-i18n="lang_label">Language</label>
+        <select class="lang-select" data-lang-select>
+          <option value="en">EN</option>
+          <option value="ru">RU</option>
+        </select>
+      </div>
       <div class="profile-anchor">
         <button id="profileToggleBtn" class="profile-toggle" type="button" aria-controls="profilePopover" aria-expanded="false">
           <img id="profileAvatarMini" class="avatar-mini" alt="Avatar" src="" />
@@ -74,6 +77,8 @@
       <button id="logoutBtn" class="ghost" hidden data-i18n="logout">Logout</button>
     </div>
   </header>
+  <div id="navDrawerBackdrop" class="nav-drawer-backdrop" hidden></div>
+  <div id="profilePopoverBackdrop" class="profile-popover-backdrop" hidden></div>
 
   <main class="layout">
     <section id="appPanel">
@@ -164,12 +169,12 @@
               <button id="categoryChartBarBtn" type="button" class="ghost" data-i18n="chart_mode_bar">Bars</button>
             </div>
           </div>
-          <canvas id="categoryChart" width="540" height="260"></canvas>
+          <canvas id="categoryChart"></canvas>
         </article>
 
         <article class="card chart-card" data-view-item="analytics">
           <h2 data-i18n="balance_timeline">Balance timeline</h2>
-          <canvas id="timelineChart" width="540" height="260"></canvas>
+          <canvas id="timelineChart"></canvas>
         </article>
 
         <article class="card chart-card" data-view-item="analytics">

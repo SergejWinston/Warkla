@@ -131,8 +131,13 @@ const el = {
   addOverlayBackdrop: document.getElementById("addOverlayBackdrop"),
   addOverlayCloseBtn: document.getElementById("addOverlayCloseBtn"),
   addOverlayTitle: document.getElementById("addOverlayTitle"),
+  topbarControls: document.getElementById("topbarControls"),
+  langControlGroup: document.getElementById("langControlGroup"),
   navToggleBtn: document.getElementById("navToggleBtn"),
   mainNav: document.getElementById("mainNav"),
+  mainNavExtras: document.getElementById("mainNavExtras"),
+  navDrawerBackdrop: document.getElementById("navDrawerBackdrop"),
+  profilePopoverBackdrop: document.getElementById("profilePopoverBackdrop"),
   profileToggleBtn: document.getElementById("profileToggleBtn"),
   profilePopover: document.getElementById("profilePopover"),
   profileCloseBtn: document.getElementById("profileCloseBtn"),
@@ -1539,23 +1544,78 @@ function renderProfile(profile) {
 
 function openProfilePopover() {
   el.profilePopover.hidden = false;
+  if (el.profilePopoverBackdrop) {
+    el.profilePopoverBackdrop.hidden = false;
+  }
   el.profileToggleBtn.setAttribute("aria-expanded", "true");
+  updateBodyOverlayState();
 }
 
 function closeProfilePopover() {
   el.profilePopover.hidden = true;
+  if (el.profilePopoverBackdrop) {
+    el.profilePopoverBackdrop.hidden = true;
+  }
   el.profileToggleBtn.setAttribute("aria-expanded", "false");
+  updateBodyOverlayState();
 }
 
 function closeNavMenu() {
+  if (!el.mainNav || !el.navToggleBtn) {
+    return;
+  }
+
   el.mainNav.classList.remove("is-open");
   el.navToggleBtn.setAttribute("aria-expanded", "false");
+  if (el.navDrawerBackdrop) {
+    el.navDrawerBackdrop.hidden = true;
+  }
+  updateBodyOverlayState();
+}
+
+function syncNavControlsForViewport() {
+  if (!el.topbarControls || !el.langControlGroup || !el.mainNavExtras || !el.logoutBtn) {
+    return;
+  }
+
+  const isMobileDrawer = window.matchMedia("(max-width: 840px)").matches;
+  if (isMobileDrawer) {
+    if (el.langControlGroup.parentElement !== el.mainNavExtras) {
+      el.mainNavExtras.appendChild(el.langControlGroup);
+    }
+    if (el.logoutBtn.parentElement !== el.mainNavExtras) {
+      el.mainNavExtras.appendChild(el.logoutBtn);
+    }
+    return;
+  }
+
+  if (el.langControlGroup.parentElement !== el.topbarControls) {
+    el.topbarControls.insertBefore(el.langControlGroup, el.topbarControls.firstChild);
+  }
+  if (el.logoutBtn.parentElement !== el.topbarControls) {
+    el.topbarControls.appendChild(el.logoutBtn);
+  }
+}
+
+function openNavMenu() {
+  if (!el.mainNav || !el.navToggleBtn) {
+    return;
+  }
+
+  el.mainNav.classList.add("is-open");
+  el.navToggleBtn.setAttribute("aria-expanded", "true");
+  if (el.navDrawerBackdrop) {
+    el.navDrawerBackdrop.hidden = false;
+  }
+  updateBodyOverlayState();
 }
 
 function updateBodyOverlayState() {
   const hasVisibleOverlay =
     (el.addOverlay && !el.addOverlay.hidden) ||
-    (el.txDetailsModal && !el.txDetailsModal.hidden);
+    (el.txDetailsModal && !el.txDetailsModal.hidden) ||
+    (el.profilePopover && !el.profilePopover.hidden) ||
+    (el.mainNav && el.mainNav.classList.contains("is-open"));
   document.body.classList.toggle("overlay-open", Boolean(hasVisibleOverlay));
 }
 
@@ -2077,11 +2137,23 @@ el.profileForm.addEventListener("submit", async (event) => {
   event.preventDefault();
   el.profileMsg.textContent = "";
 
+  const selectedCurrency = el.profileCurrency
+    ? String(el.profileCurrency.value || state.preferredCurrency)
+    : state.preferredCurrency;
+
   const payload = {
-    username: el.profileUsername.value.trim(),
-    stipend_day: Number(el.profileStipendDay.value),
-    preferred_currency: normalizeCurrency(el.profileCurrency ? el.profileCurrency.value : state.preferredCurrency),
+    preferred_currency: normalizeCurrency(selectedCurrency, state.preferredCurrency),
   };
+
+  const username = el.profileUsername.value.trim();
+  if (username) {
+    payload.username = username;
+  }
+
+  const stipendDayValue = Number(el.profileStipendDay.value);
+  if (Number.isInteger(stipendDayValue) && stipendDayValue >= 1 && stipendDayValue <= 31) {
+    payload.stipend_day = stipendDayValue;
+  }
 
   try {
     const result = await api("/api/profile", {
@@ -2353,9 +2425,11 @@ el.viewLinks.forEach((link) => {
 });
 
 el.navToggleBtn.addEventListener("click", () => {
-  const willOpen = !el.mainNav.classList.contains("is-open");
-  el.mainNav.classList.toggle("is-open", willOpen);
-  el.navToggleBtn.setAttribute("aria-expanded", willOpen ? "true" : "false");
+  if (el.mainNav.classList.contains("is-open")) {
+    closeNavMenu();
+    return;
+  }
+  openNavMenu();
 });
 
 el.profileToggleBtn.addEventListener("click", () => {
@@ -2378,6 +2452,16 @@ document.addEventListener("click", (event) => {
 
   if (!el.profilePopover.hidden && !el.profilePopover.contains(target) && !el.profileToggleBtn.contains(target)) {
     closeProfilePopover();
+  }
+
+  if (el.profilePopoverBackdrop && !el.profilePopoverBackdrop.hidden && target === el.profilePopoverBackdrop) {
+    closeProfilePopover();
+    return;
+  }
+
+  if (el.navDrawerBackdrop && !el.navDrawerBackdrop.hidden && target === el.navDrawerBackdrop) {
+    closeNavMenu();
+    return;
   }
 
   if (el.mainNav.classList.contains("is-open") && !el.mainNav.contains(target) && !el.navToggleBtn.contains(target)) {
@@ -2643,6 +2727,10 @@ let resizeTimer = null;
 window.addEventListener("resize", () => {
   window.clearTimeout(resizeTimer);
   resizeTimer = window.setTimeout(() => {
+    syncNavControlsForViewport();
+    if (window.innerWidth > 840) {
+      closeNavMenu();
+    }
     renderCategoryChart();
     drawLine(el.timelineChart, state.timeline);
   }, 120);
@@ -2669,6 +2757,7 @@ if (el.categoryChartBarBtn) {
   }
 
   el.logoutBtn.hidden = false;
+  syncNavControlsForViewport();
   state.customTemplates = loadCustomTemplates();
   renderFloatingAddLabel();
   renderTemplateLists();

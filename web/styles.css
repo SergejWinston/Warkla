@@ -94,7 +94,7 @@ body.overlay-open {
 .topbar {
   position: sticky;
   top: 0;
-  z-index: 40;
+  z-index: 75;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -110,6 +110,8 @@ body.overlay-open {
   display: flex;
   align-items: center;
   gap: 0.75rem;
+  text-decoration: none;
+  color: inherit;
 }
 
 .brand h1 {
@@ -207,10 +209,20 @@ body.overlay-open {
   display: none;
 }
 
+.main-nav-extras {
+  display: none;
+}
+
 .topbar-controls {
   display: flex;
   align-items: center;
   gap: 0.5rem;
+}
+
+.lang-control-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.42rem;
 }
 
 .lang-select-wrap {
@@ -260,6 +272,18 @@ body.overlay-open {
   z-index: 80;
 }
 
+.profile-popover-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  background: rgba(24, 29, 41, 0.36);
+  backdrop-filter: blur(4px);
+}
+
+.profile-popover-backdrop[hidden] {
+  display: none !important;
+}
+
 .profile-popover-head {
   display: flex;
   justify-content: space-between;
@@ -285,6 +309,18 @@ body.overlay-open {
   max-width: 1220px;
   margin: 0 auto;
   padding: 1rem 1rem 2.4rem;
+}
+
+.nav-drawer-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  background: rgba(24, 29, 41, 0.38);
+  backdrop-filter: blur(2px);
+}
+
+.nav-drawer-backdrop[hidden] {
+  display: none !important;
 }
 
 .overlay-backdrop {
@@ -1183,6 +1219,7 @@ canvas {
 
 .tx-list.compact {
   max-height: 270px;
+  overflow: auto;
 }
 
 .tx-item {
@@ -1892,35 +1929,97 @@ canvas {
 }
 
 @media (max-width: 840px) {
+  .topbar {
+    flex-wrap: nowrap;
+  }
+
+  .brand {
+    min-width: 0;
+  }
+
   .menu-toggle {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    order: 2;
+    order: 3;
   }
 
   .main-nav {
-    display: none;
-    width: 100%;
-    order: 4;
-    border-radius: 18px;
-    box-shadow: none;
-    padding: 0.4rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    width: min(86vw, 360px);
+    height: 100dvh;
+    z-index: 80;
+    border: 2px solid var(--line);
+    border-left: 0;
+    border-radius: 0 20px 20px 0;
+    box-shadow: 14px 0 24px rgba(26, 34, 48, 0.18);
+    padding: calc(env(safe-area-inset-top, 0px) + 1rem) 0.8rem calc(env(safe-area-inset-bottom, 0px) + 1rem);
+    background: #fffdf2;
+    transform: translateX(-105%);
+    opacity: 0;
+    pointer-events: none;
+    overflow: auto;
+    overscroll-behavior: contain;
+    transition: transform var(--trans-base), opacity var(--trans-base);
   }
 
   .main-nav.is-open {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 0.35rem;
+    transform: translateX(0);
+    opacity: 1;
+    pointer-events: auto;
   }
 
   .main-nav a {
-    text-align: center;
+    text-align: left;
     border: 1px solid rgba(34, 38, 53, 0.2);
+    border-radius: 12px;
+    padding: 0.62rem 0.78rem;
+  }
+
+  .main-nav-extras {
+    display: grid;
+    gap: 0.45rem;
+    margin-top: auto;
+    padding-top: 0.55rem;
+    border-top: 1px dashed rgba(34, 38, 53, 0.28);
+  }
+
+  .main-nav-extras .lang-control-group {
+    display: grid;
+    gap: 0.3rem;
+  }
+
+  .main-nav-extras .lang-select {
+    width: 100%;
+    min-height: 44px;
+  }
+
+  .main-nav-extras #logoutBtn {
+    width: 100%;
+    min-height: 44px;
   }
 
   .topbar-controls {
+    order: 2;
     margin-left: auto;
+  }
+
+  .profile-popover {
+    position: fixed;
+    left: 50vw;
+    top: calc(env(safe-area-inset-top, 0px) + 50dvh);
+    right: auto;
+    width: min(420px, calc(100vw - 1rem));
+    max-height: calc(100dvh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) - 1.2rem);
+    overflow: auto;
+    transform: translate(-50%, -50%);
+    z-index: 95;
   }
 
   .widgets-grid {
@@ -1943,17 +2042,45 @@ canvas {
 
 @media (max-width: 640px) {
   .topbar {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto auto;
+    align-items: center;
+    column-gap: 0.5rem;
+    row-gap: 0;
     padding: 0.72rem 0.8rem;
   }
 
+  .brand {
+    min-width: 0;
+  }
+
+  .brand h1 {
+    max-width: 100%;
+    font-size: 1.08rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .menu-toggle {
+    order: 3;
+  }
+
   .topbar-controls {
-    width: 100%;
+    grid-column: auto;
+    width: auto;
+    flex-wrap: nowrap;
     justify-content: flex-end;
+    row-gap: 0;
+  }
+
+  .main-nav {
+    width: min(92vw, 340px);
   }
 
   .profile-popover {
-    right: -0.35rem;
-    width: min(380px, calc(100vw - 0.8rem));
+    width: min(420px, calc(100vw - 1rem));
+    max-height: calc(100dvh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) - 1.2rem);
   }
 
   .kpis {
@@ -2035,7 +2162,7 @@ canvas {
   #historyResetBtn,
   #historyExportCsvBtn,
   #historyExportPdfBtn {
-    min-height: 40px;
+    min-height: 44px;
   }
 
   .history-toolbar-row--top,
@@ -2054,7 +2181,8 @@ canvas {
   }
 
   .tx-list {
-    max-height: 280px;
+    max-height: none;
+    overflow: visible;
   }
 
   .tx-details-grid {
@@ -2077,6 +2205,52 @@ canvas {
     width: 24px;
     height: 24px;
     font-size: 0.68rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .topbar {
+    padding: 0.62rem;
+  }
+
+  .brand h1 {
+    font-size: 0.98rem;
+  }
+
+  .menu-toggle {
+    min-height: 40px;
+  }
+
+  .main-nav {
+    width: min(96vw, 320px);
+    padding: calc(env(safe-area-inset-top, 0px) + 0.85rem) 0.7rem calc(env(safe-area-inset-bottom, 0px) + 0.85rem);
+  }
+
+  .topbar-controls {
+    justify-content: flex-end;
+  }
+
+  .profile-popover {
+    width: calc(100vw - 0.6rem);
+    max-height: calc(100dvh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) - 0.8rem);
+    padding: 0.72rem;
+  }
+
+  .history-toolbar {
+    padding: 0.5rem;
+  }
+
+  .history-toolbar-row--top,
+  .history-toolbar-row--filters,
+  .history-toolbar-row--exports {
+    grid-template-columns: 1fr;
+  }
+
+  #historyApplyBtn,
+  #historyResetBtn,
+  #historyExportCsvBtn,
+  #historyExportPdfBtn {
+    width: 100%;
   }
 }
 
