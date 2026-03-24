@@ -17,6 +17,8 @@ WARNING_PRIORITY = {
     "success": 1,
 }
 
+RUB_PER_USD = Decimal("80")
+
 LEGACY_WARNING_TEXT = {
     "warning_budget_depleted": "Budget is depleted. Any new expense worsens your outlook.",
     "warning_daily_limit_exceeded": "Today's spending exceeded your safe limit.",
@@ -28,6 +30,18 @@ LEGACY_WARNING_TEXT = {
 
 def _clamp_day(day: int, year: int, month: int) -> int:
     return min(max(1, day), monthrange(year, month)[1])
+
+
+def _normalize_currency(currency: str | None) -> str:
+    normalized = (currency or "RUB").strip().upper()
+    return normalized if normalized in {"RUB", "USD"} else "RUB"
+
+
+def _to_rub(amount: Decimal, currency: str | None) -> Decimal:
+    normalized = _normalize_currency(currency)
+    if normalized == "USD":
+        return amount * RUB_PER_USD
+    return amount
 
 
 def calculate_days_to_stipend(stipend_day: int, today: date | None = None) -> int:
@@ -51,15 +65,20 @@ def calculate_days_to_stipend(stipend_day: int, today: date | None = None) -> in
 
 
 def _sum_for_range(user_id: int, tx_type: str, start: date, end: date) -> Decimal:
-    value = (
-        Transaction.query.with_entities(func.coalesce(func.sum(Transaction.amount), 0))
+    rows = (
+        Transaction.query.with_entities(Transaction.amount, Transaction.currency)
         .filter(Transaction.user_id == user_id)
         .filter(Transaction.tx_type == tx_type)
         .filter(Transaction.tx_date >= start)
         .filter(Transaction.tx_date <= end)
-        .scalar()
+        .all()
     )
-    return Decimal(value or 0)
+
+    total = Decimal(0)
+    for amount, currency in rows:
+        total += _to_rub(Decimal(amount or 0), currency)
+
+    return total
 
 
 def calculate_balance(user_id: int) -> Decimal:
@@ -99,50 +118,56 @@ def month_end_forecast(user_id: int, today: date | None = None) -> Decimal:
 
 def categories_breakdown(user_id: int, date_from: date, date_to: date) -> list[dict]:
     rows = (
-        Transaction.query.with_entities(
-            Transaction.category,
-            func.coalesce(func.sum(Transaction.amount), 0).label("total"),
-        )
+        Transaction.query.with_entities(Transaction.category, Transaction.amount, Transaction.currency)
         .filter(Transaction.user_id == user_id)
         .filter(Transaction.tx_type == "expense")
         .filter(Transaction.tx_date >= date_from)
         .filter(Transaction.tx_date <= date_to)
-        .group_by(Transaction.category)
-        .order_by(func.sum(Transaction.amount).desc())
         .all()
     )
 
+    grouped: dict[str, Decimal] = {}
+    for category, amount, currency in rows:
+        key = category or "Без категории"
+        grouped[key] = grouped.get(key, Decimal(0)) + _to_rub(Decimal(amount or 0), currency)
+
+    ordered = sorted(grouped.items(), key=lambda item: item[1], reverse=True)
+
     return [
         {
-            "category": category or "Без категории",
+            "category": category,
             "amount": float(total),
         }
-        for category, total in rows
+        for category, total in ordered
     ]
 
 
 def timeline_data(user_id: int, date_from: date, date_to: date) -> list[dict]:
     incomes = (
-        Transaction.query.with_entities(Transaction.tx_date, func.coalesce(func.sum(Transaction.amount), 0))
+        Transaction.query.with_entities(Transaction.tx_date, Transaction.amount, Transaction.currency)
         .filter(Transaction.user_id == user_id)
         .filter(Transaction.tx_type == "income")
         .filter(Transaction.tx_date >= date_from)
         .filter(Transaction.tx_date <= date_to)
-        .group_by(Transaction.tx_date)
         .all()
     )
     expenses = (
-        Transaction.query.with_entities(Transaction.tx_date, func.coalesce(func.sum(Transaction.amount), 0))
+        Transaction.query.with_entities(Transaction.tx_date, Transaction.amount, Transaction.currency)
         .filter(Transaction.user_id == user_id)
         .filter(Transaction.tx_type == "expense")
         .filter(Transaction.tx_date >= date_from)
         .filter(Transaction.tx_date <= date_to)
-        .group_by(Transaction.tx_date)
         .all()
     )
 
-    income_map = {d: Decimal(v) for d, v in incomes}
-    expense_map = {d: Decimal(v) for d, v in expenses}
+    income_map: dict[date, Decimal] = {}
+    expense_map: dict[date, Decimal] = {}
+
+    for tx_date, amount, currency in incomes:
+        income_map[tx_date] = income_map.get(tx_date, Decimal(0)) + _to_rub(Decimal(amount or 0), currency)
+
+    for tx_date, amount, currency in expenses:
+        expense_map[tx_date] = expense_map.get(tx_date, Decimal(0)) + _to_rub(Decimal(amount or 0), currency)
 
     cursor = date_from
     running = Decimal(0)
@@ -226,7 +251,8 @@ def _day_totals(user_id: int, tx_type: str, date_from: date, date_to: date, cate
     query = (
         Transaction.query.with_entities(
             Transaction.tx_date,
-            func.coalesce(func.sum(Transaction.amount), 0).label("total"),
+            Transaction.amount,
+            Transaction.currency,
         )
         .filter(Transaction.user_id == user_id)
         .filter(Transaction.tx_type == tx_type)
@@ -238,8 +264,12 @@ def _day_totals(user_id: int, tx_type: str, date_from: date, date_to: date, cate
     if normalized_category:
         query = query.filter(func.lower(func.coalesce(Transaction.category, "")) == normalized_category.lower())
 
-    rows = query.group_by(Transaction.tx_date).order_by(Transaction.tx_date.asc()).all()
-    return [(tx_date, Decimal(total or 0)) for tx_date, total in rows]
+    rows = query.order_by(Transaction.tx_date.asc()).all()
+    totals: dict[date, Decimal] = {}
+    for tx_date, amount, currency in rows:
+        totals[tx_date] = totals.get(tx_date, Decimal(0)) + _to_rub(Decimal(amount or 0), currency)
+
+    return sorted(totals.items(), key=lambda item: item[0])
 
 
 def _period_bounds(period: str, today: date | None = None) -> tuple[date, date, date, date, str]:
@@ -288,25 +318,27 @@ def _period_bounds(period: str, today: date | None = None) -> tuple[date, date, 
 
 def income_breakdown(user_id: int, date_from: date, date_to: date) -> list[dict]:
     rows = (
-        Transaction.query.with_entities(
-            Transaction.source,
-            func.coalesce(func.sum(Transaction.amount), 0).label("total"),
-        )
+        Transaction.query.with_entities(Transaction.source, Transaction.amount, Transaction.currency)
         .filter(Transaction.user_id == user_id)
         .filter(Transaction.tx_type == "income")
         .filter(Transaction.tx_date >= date_from)
         .filter(Transaction.tx_date <= date_to)
-        .group_by(Transaction.source)
-        .order_by(func.sum(Transaction.amount).desc())
         .all()
     )
 
+    grouped: dict[str, Decimal] = {}
+    for source, amount, currency in rows:
+        key = source or "Не указан"
+        grouped[key] = grouped.get(key, Decimal(0)) + _to_rub(Decimal(amount or 0), currency)
+
+    ordered = sorted(grouped.items(), key=lambda item: item[1], reverse=True)
+
     return [
         {
-            "source": source or "Не указан",
+            "source": source,
             "amount": float(total),
         }
-        for source, total in rows
+        for source, total in ordered
     ]
 
 

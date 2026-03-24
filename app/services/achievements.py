@@ -10,6 +10,16 @@ from app.extensions import db
 from app.models import Achievement, Transaction, User, UserAchievement
 
 
+RUB_PER_USD = 80.0
+
+
+def _to_rub(amount: float, currency: str | None) -> float:
+    normalized = (currency or "RUB").strip().upper()
+    if normalized == "USD":
+        return amount * RUB_PER_USD
+    return amount
+
+
 DEFAULT_ACHIEVEMENTS = [
     {
         "key": "operations_1",
@@ -188,23 +198,26 @@ def _categories_count(user_id: int) -> int:
 
 
 def _total_expense_amount(user_id: int) -> float:
-    value = (
-        db.session.query(func.coalesce(func.sum(Transaction.amount), 0))
+    rows = (
+        db.session.query(Transaction.amount, Transaction.currency)
         .filter(Transaction.user_id == user_id)
         .filter(Transaction.tx_type == "expense")
-        .scalar()
+        .all()
     )
-    return float(value or 0)
+    return sum(_to_rub(float(amount or 0), currency) for amount, currency in rows)
 
 
 def _max_single_expense(user_id: int) -> float:
-    value = (
-        db.session.query(func.coalesce(func.max(Transaction.amount), 0))
+    rows = (
+        db.session.query(Transaction.amount, Transaction.currency)
         .filter(Transaction.user_id == user_id)
         .filter(Transaction.tx_type == "expense")
-        .scalar()
+        .all()
     )
-    return float(value or 0)
+    if not rows:
+        return 0.0
+
+    return max(_to_rub(float(amount or 0), currency) for amount, currency in rows)
 
 
 def _discount_expenses_count(user_id: int) -> int:

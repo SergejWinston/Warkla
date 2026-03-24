@@ -59,6 +59,13 @@
               <label for="profileStipendDay" data-i18n="stipend_day">Stipend day (1-31)</label>
               <input id="profileStipendDay" type="number" min="1" max="31" required />
             </div>
+            <div class="row">
+              <label for="profileCurrency" data-i18n="profile_currency">Global currency</label>
+              <select id="profileCurrency">
+                <option value="RUB" data-i18n="currency_rub">RUB</option>
+                <option value="USD" data-i18n="currency_usd">USD</option>
+              </select>
+            </div>
             <button class="primary" type="submit" data-i18n="save_profile">Save profile</button>
           </form>
           <p id="profileMsg" class="msg"></p>

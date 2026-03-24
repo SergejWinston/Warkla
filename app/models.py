@@ -102,6 +102,7 @@ class UserProfile(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False, unique=True, index=True)
     avatar_path = db.Column(db.String(255), nullable=True)
+    preferred_currency = db.Column(db.String(3), nullable=False, default="RUB")
     updated_at = db.Column(db.DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
 
     user = db.relationship("User", back_populates="profile")

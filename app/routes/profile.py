@@ -17,6 +17,7 @@ from app.models import User, UserProfile
 profile_bp = Blueprint("profile", __name__, url_prefix="/api/profile")
 
 ALLOWED_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp"}
+SUPPORTED_CURRENCIES = {"RUB", "USD"}
 
 
 def _current_user() -> User | None:
@@ -37,6 +38,13 @@ def _get_or_create_profile(user_id: int) -> UserProfile:
     db.session.add(profile)
     db.session.commit()
     return profile
+
+
+def _normalize_currency(raw: str | None) -> str | None:
+    normalized = (raw or "").strip().upper()
+    if not normalized:
+        return None
+    return normalized
 
 
 def _avatar_data_url(avatar_path: str | None) -> str | None:
@@ -66,6 +74,7 @@ def get_profile():
             "username": user.username,
             "email": user.email,
             "stipend_day": user.stipend_day,
+            "preferred_currency": profile.preferred_currency or "RUB",
             "avatar_data_url": _avatar_data_url(profile.avatar_path),
         }
     )
@@ -82,6 +91,7 @@ def update_profile():
 
     username = data.get("username")
     stipend_day = data.get("stipend_day")
+    preferred_currency = _normalize_currency(data.get("preferred_currency")) if "preferred_currency" in data else None
 
     if isinstance(username, str):
         username = username.strip()
@@ -102,6 +112,12 @@ def update_profile():
         user.stipend_day = stipend_day_int
 
     profile = _get_or_create_profile(user.id)
+
+    if preferred_currency is not None:
+        if preferred_currency not in SUPPORTED_CURRENCIES:
+            return jsonify({"error": "preferred_currency must be one of: RUB, USD"}), 400
+        profile.preferred_currency = preferred_currency
+
     profile.updated_at = datetime.now(timezone.utc)
 
     db.session.commit()
@@ -113,6 +129,7 @@ def update_profile():
                 "username": user.username,
                 "email": user.email,
                 "stipend_day": user.stipend_day,
+                "preferred_currency": profile.preferred_currency or "RUB",
                 "avatar_data_url": _avatar_data_url(profile.avatar_path),
             },
         }

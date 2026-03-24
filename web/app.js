@@ -46,7 +46,10 @@ const state = {
   notifications: {
     dedupeMap: {},
   },
+  preferredCurrency: "RUB",
 };
+
+const RUB_PER_USD = 80;
 
 const t = window.I18N ? window.I18N.t : (key) => key;
 const FIXED_CATEGORIES = [
@@ -140,6 +143,7 @@ const el = {
   profileMsg: document.getElementById("profileMsg"),
   profileUsername: document.getElementById("profileUsername"),
   profileStipendDay: document.getElementById("profileStipendDay"),
+  profileCurrency: document.getElementById("profileCurrency"),
   profileAvatar: document.getElementById("profileAvatar"),
   avatarInput: document.getElementById("avatarInput"),
   avatarUploadBtn: document.getElementById("avatarUploadBtn"),
@@ -242,12 +246,38 @@ function escapeHtml(value) {
     .replaceAll("'", "&#39;");
 }
 
-function money(value, currency = "RUB") {
+function normalizeCurrency(value, fallback = "RUB") {
+  const normalized = String(value || "").trim().toUpperCase();
+  if (normalized === "RUB" || normalized === "USD") {
+    return normalized;
+  }
+  return fallback;
+}
+
+function convertMoney(value, fromCurrency = "RUB", toCurrency = state.preferredCurrency) {
   const numeric = Number(value || 0);
+  const from = normalizeCurrency(fromCurrency);
+  const to = normalizeCurrency(toCurrency);
+
+  if (!Number.isFinite(numeric) || from === to) {
+    return numeric;
+  }
+
+  if (from === "RUB" && to === "USD") {
+    return numeric / RUB_PER_USD;
+  }
+
+  if (from === "USD" && to === "RUB") {
+    return numeric * RUB_PER_USD;
+  }
+
+  return numeric;
+}
+
+function money(value, sourceCurrency = "RUB", targetCurrency = state.preferredCurrency) {
+  const numeric = convertMoney(value, sourceCurrency, targetCurrency);
   const locale = window.I18N && window.I18N.getLanguage && window.I18N.getLanguage() === "ru" ? "ru-RU" : "en-US";
-  const resolvedCurrency = ["RUB", "USD"].includes(String(currency || "").toUpperCase())
-    ? String(currency || "").toUpperCase()
-    : "RUB";
+  const resolvedCurrency = normalizeCurrency(targetCurrency);
   return new Intl.NumberFormat(locale, { style: "currency", currency: resolvedCurrency }).format(numeric);
 }
 
@@ -1495,6 +1525,13 @@ function defaultAvatarDataUrl() {
 function renderProfile(profile) {
   el.profileUsername.value = profile.username || "";
   el.profileStipendDay.value = String(profile.stipend_day || 25);
+  state.preferredCurrency = normalizeCurrency(profile.preferred_currency, "RUB");
+  if (el.profileCurrency) {
+    el.profileCurrency.value = state.preferredCurrency;
+  }
+  if (el.txCurrency) {
+    el.txCurrency.value = state.preferredCurrency;
+  }
   const avatar = profile.avatar_data_url || defaultAvatarDataUrl();
   el.profileAvatar.src = avatar;
   el.profileAvatarMini.src = avatar;
@@ -2043,6 +2080,7 @@ el.profileForm.addEventListener("submit", async (event) => {
   const payload = {
     username: el.profileUsername.value.trim(),
     stipend_day: Number(el.profileStipendDay.value),
+    preferred_currency: normalizeCurrency(el.profileCurrency ? el.profileCurrency.value : state.preferredCurrency),
   };
 
   try {
