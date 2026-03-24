@@ -118,6 +118,7 @@ python run.py
 
 ```bash
 docker build -t warkla:latest .
+docker pull ghcr.io/sergejwinston/warkla:latest
 docker run --rm -p 5000:5000 --name warkla warkla:latest
 ```
 
