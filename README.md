@@ -117,9 +117,16 @@ python run.py
 ## 7. Запуск в Docker
 
 ```bash
-docker build -t warkla:latest .
 docker pull ghcr.io/sergejwinston/warkla:latest
-docker run --rm -p 5000:5000 --name warkla warkla:latest
+docker run -d \
+  --name warkla \
+  -p 5000:5000 \
+  -e SECRET_KEY='change-me' \
+  -e JWT_SECRET_KEY='change-me-too' \
+  -e DATABASE_URL='sqlite:////app/data/warkla.db' \
+  -e UPLOAD_FOLDER='/app/data/uploads' \
+  -v $(pwd)/data:/app/data \
+  ghcr.io/sergejwinston/warkla
 ```
 
 Контейнер стартует через Gunicorn (`run:app`) и слушает порт `5000`.
