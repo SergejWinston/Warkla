@@ -18,12 +18,24 @@ depends_on = None
 
 
 def upgrade():
-    op.add_column(
-        "transactions",
-        sa.Column("is_discount", sa.Boolean(), nullable=False, server_default=sa.false()),
-    )
-    op.alter_column("transactions", "is_discount", server_default=None)
+    bind = op.get_bind()
+    inspector = sa.inspect(bind)
+    existing = {col["name"] for col in inspector.get_columns("transactions")}
+
+    if "is_discount" not in existing:
+        op.add_column(
+            "transactions",
+            sa.Column("is_discount", sa.Boolean(), nullable=False, server_default=sa.false()),
+        )
+
+    # SQLite does not support ALTER COLUMN ... DROP DEFAULT.
+    if bind.dialect.name != "sqlite":
+        op.alter_column("transactions", "is_discount", server_default=None)
 
 
 def downgrade():
-    op.drop_column("transactions", "is_discount")
+    bind = op.get_bind()
+    inspector = sa.inspect(bind)
+    existing = {col["name"] for col in inspector.get_columns("transactions")}
+    if "is_discount" in existing:
+        op.drop_column("transactions", "is_discount")
