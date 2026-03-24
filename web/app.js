@@ -14,6 +14,7 @@ const state = {
   analyticsSources: [],
   analyticsComparison: null,
   analyticsAnomalies: [],
+  categoryChartMode: "pie",
   achievementsUi: {
     filter: "all",
     sort: "progress",
@@ -34,9 +35,47 @@ const state = {
     loading: false,
     items: [],
   },
+  txDetails: {
+    transactionId: null,
+    receiptObjectUrl: "",
+    loading: false,
+    editMode: false,
+    data: null,
+  },
+  editingTransactionId: null,
 };
 
 const t = window.I18N ? window.I18N.t : (key) => key;
+const FIXED_CATEGORIES = [
+  "food",
+  "transport",
+  "entertainment",
+  "study",
+  "communication",
+  "health",
+  "housing",
+  "other",
+];
+const CATEGORY_ALIASES = {
+  food: "food",
+  еда: "food",
+  transport: "transport",
+  транспорт: "transport",
+  entertainment: "entertainment",
+  развлечения: "entertainment",
+  study: "study",
+  учеба: "study",
+  "учёба": "study",
+  communication: "communication",
+  связь: "communication",
+  health: "health",
+  здоровье: "health",
+  housing: "housing",
+  жилье: "housing",
+  "жильё": "housing",
+  other: "other",
+  прочее: "other",
+};
 
 const WARNING_TEXT_TO_KEY = {
   "today's spending is above your safe daily limit.": "warning_daily_limit_exceeded",
@@ -85,6 +124,7 @@ const el = {
   addOverlay: document.getElementById("addOverlay"),
   addOverlayBackdrop: document.getElementById("addOverlayBackdrop"),
   addOverlayCloseBtn: document.getElementById("addOverlayCloseBtn"),
+  addOverlayTitle: document.getElementById("addOverlayTitle"),
   navToggleBtn: document.getElementById("navToggleBtn"),
   mainNav: document.getElementById("mainNav"),
   profileToggleBtn: document.getElementById("profileToggleBtn"),
@@ -103,11 +143,14 @@ const el = {
   txForm: document.getElementById("txForm"),
   txType: document.getElementById("txType"),
   txAmount: document.getElementById("txAmount"),
+  txCurrency: document.getElementById("txCurrency"),
   txAmountHint: document.getElementById("txAmountHint"),
   txCategory: document.getElementById("txCategory"),
   txSource: document.getElementById("txSource"),
   txDate: document.getElementById("txDate"),
   txNote: document.getElementById("txNote"),
+  txReceiptAddInput: document.getElementById("txReceiptAddInput"),
+  txSubmitBtn: document.getElementById("txSubmitBtn"),
   templatesPanel: document.getElementById("templatesPanel"),
   builtinTemplates: document.getElementById("builtinTemplates"),
   customTemplates: document.getElementById("customTemplates"),
@@ -153,11 +196,35 @@ const el = {
   historyDateTo: document.getElementById("historyDateTo"),
   historyApplyBtn: document.getElementById("historyApplyBtn"),
   historyResetBtn: document.getElementById("historyResetBtn"),
+  historyExportCsvBtn: document.getElementById("historyExportCsvBtn"),
+  historyExportPdfBtn: document.getElementById("historyExportPdfBtn"),
   historyStatus: document.getElementById("historyStatus"),
   historyError: document.getElementById("historyError"),
   historyErrorText: document.getElementById("historyErrorText"),
   historyRetryBtn: document.getElementById("historyRetryBtn"),
   historyLoadMoreBtn: document.getElementById("historyLoadMoreBtn"),
+  txDetailsBackdrop: document.getElementById("txDetailsBackdrop"),
+  txDetailsModal: document.getElementById("txDetailsModal"),
+  txDetailsCloseBtn: document.getElementById("txDetailsCloseBtn"),
+  txDetailsMsg: document.getElementById("txDetailsMsg"),
+  txDetailsType: document.getElementById("txDetailsType"),
+  txDetailsAmountInput: document.getElementById("txDetailsAmountInput"),
+  txDetailsCurrency: document.getElementById("txDetailsCurrency"),
+  txDetailsCategorySelect: document.getElementById("txDetailsCategorySelect"),
+  txDetailsSourceInput: document.getElementById("txDetailsSourceInput"),
+  txDetailsDate: document.getElementById("txDetailsDate"),
+  txDetailsNoteInput: document.getElementById("txDetailsNoteInput"),
+  txReceiptHint: document.getElementById("txReceiptHint"),
+  txReceiptPreview: document.getElementById("txReceiptPreview"),
+  txReceiptInput: document.getElementById("txReceiptInput"),
+  txReceiptUploadBtn: document.getElementById("txReceiptUploadBtn"),
+  txReceiptDownloadBtn: document.getElementById("txReceiptDownloadBtn"),
+  txEditBtn: document.getElementById("txEditBtn"),
+  txSaveBtn: document.getElementById("txSaveBtn"),
+  txCancelEditBtn: document.getElementById("txCancelEditBtn"),
+  txDeleteBtn: document.getElementById("txDeleteBtn"),
+  categoryChartPieBtn: document.getElementById("categoryChartPieBtn"),
+  categoryChartBarBtn: document.getElementById("categoryChartBarBtn"),
 };
 
 function escapeHtml(value) {
@@ -169,14 +236,28 @@ function escapeHtml(value) {
     .replaceAll("'", "&#39;");
 }
 
-function money(value) {
+function money(value, currency = "RUB") {
   const numeric = Number(value || 0);
   const locale = window.I18N && window.I18N.getLanguage && window.I18N.getLanguage() === "ru" ? "ru-RU" : "en-US";
-  return new Intl.NumberFormat(locale, { style: "currency", currency: "USD" }).format(numeric);
+  const resolvedCurrency = ["RUB", "USD"].includes(String(currency || "").toUpperCase())
+    ? String(currency || "").toUpperCase()
+    : "RUB";
+  return new Intl.NumberFormat(locale, { style: "currency", currency: resolvedCurrency }).format(numeric);
 }
 
 function capitalizeCategoryLabel(value) {
-  const text = String(value || "").trim();
+  const raw = String(value || "").trim();
+  if (!raw) {
+    return "";
+  }
+
+  const normalized = CATEGORY_ALIASES[raw.toLowerCase()] || raw.toLowerCase();
+  const i18nLabel = t(`category_${normalized}`);
+  if (i18nLabel && i18nLabel !== `category_${normalized}`) {
+    return i18nLabel;
+  }
+
+  const text = raw;
   if (!text) {
     return "";
   }
@@ -185,6 +266,27 @@ function capitalizeCategoryLabel(value) {
     .split(/\s+/)
     .map((chunk) => (chunk ? chunk.charAt(0).toUpperCase() + chunk.slice(1).toLowerCase() : ""))
     .join(" ");
+}
+
+function normalizeCategoryValue(value) {
+  return CATEGORY_ALIASES[String(value || "").trim().toLowerCase()] || "";
+}
+
+function syncCategoryAndSourceByType() {
+  const type = el.txType.value;
+  const isExpense = type === "expense";
+
+  el.txCategory.disabled = !isExpense;
+  el.txCategory.required = isExpense;
+  if (!isExpense) {
+    el.txCategory.value = "";
+  }
+
+  el.txSource.disabled = isExpense;
+  el.txSource.required = !isExpense;
+  if (isExpense) {
+    el.txSource.value = "";
+  }
 }
 
 async function api(path, options = {}) {
@@ -282,6 +384,96 @@ function drawBars(canvas, items) {
     ctx.font = "700 10px Manrope";
     ctx.fillText(money(value), x + barWidth / 2, y - 5);
   });
+}
+
+function drawPie(canvas, items) {
+  syncCanvasSize(canvas);
+  const ctx = canvas.getContext("2d");
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  if (!items.length) {
+    ctx.fillStyle = "#7a7f93";
+    ctx.font = "600 14px Manrope";
+    ctx.fillText(t("no_data_for_chart"), 16, 32);
+    return;
+  }
+
+  const total = items.reduce((sum, item) => sum + Number(item.amount || 0), 0);
+  if (!Number.isFinite(total) || total <= 0) {
+    ctx.fillStyle = "#7a7f93";
+    ctx.font = "600 14px Manrope";
+    ctx.fillText(t("no_data_for_chart"), 16, 32);
+    return;
+  }
+
+  const colors = ["#d85437", "#23957f", "#f18f01", "#5b7cfa", "#a14ad8", "#e35d93", "#53a66f", "#8f5b3f"];
+  const legendX = Math.max(16, Math.floor(canvas.width * 0.6));
+  const centerX = Math.floor(canvas.width * 0.28);
+  const centerY = Math.floor(canvas.height * 0.52);
+  const radius = Math.max(40, Math.min(Math.floor(canvas.height * 0.35), Math.floor(canvas.width * 0.2)));
+
+  let startAngle = -Math.PI / 2;
+  items.forEach((item, index) => {
+    const value = Number(item.amount || 0);
+    const angle = (value / total) * Math.PI * 2;
+    const color = colors[index % colors.length];
+
+    ctx.beginPath();
+    ctx.moveTo(centerX, centerY);
+    ctx.arc(centerX, centerY, radius, startAngle, startAngle + angle);
+    ctx.closePath();
+    ctx.fillStyle = color;
+    ctx.fill();
+
+    startAngle += angle;
+  });
+
+  ctx.beginPath();
+  ctx.fillStyle = "#fff";
+  ctx.arc(centerX, centerY, Math.max(15, Math.floor(radius * 0.48)), 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.fillStyle = "#242834";
+  ctx.font = "700 12px Manrope";
+  ctx.textAlign = "center";
+  ctx.fillText("100%", centerX, centerY + 4);
+
+  ctx.textAlign = "left";
+  ctx.font = "600 12px Manrope";
+  const maxLegendRows = Math.min(items.length, 7);
+  for (let i = 0; i < maxLegendRows; i += 1) {
+    const item = items[i];
+    const color = colors[i % colors.length];
+    const value = Number(item.amount || 0);
+    const percent = Math.round((value / total) * 100);
+    const y = 24 + i * 26;
+
+    ctx.fillStyle = color;
+    ctx.fillRect(legendX, y, 12, 12);
+
+    ctx.fillStyle = "#242834";
+    const label = `${capitalizeCategoryLabel(item.category || "-")} ${percent}%`;
+    ctx.fillText(label, legendX + 18, y + 10);
+  }
+}
+
+function renderCategoryChartModeSwitch() {
+  if (!el.categoryChartPieBtn || !el.categoryChartBarBtn) {
+    return;
+  }
+
+  const isPie = state.categoryChartMode === "pie";
+  el.categoryChartPieBtn.classList.toggle("is-active", isPie);
+  el.categoryChartBarBtn.classList.toggle("is-active", !isPie);
+}
+
+function renderCategoryChart() {
+  if (state.categoryChartMode === "bar") {
+    drawBars(el.categoryChart, state.categories);
+  } else {
+    drawPie(el.categoryChart, state.categories);
+  }
+  renderCategoryChartModeSwitch();
 }
 
 function drawLine(canvas, items) {
@@ -382,7 +574,7 @@ function renderTransactions(items, targetElement, limit = null) {
       const noteLine = tx.note ? `<div class="tx-note">${escapeHtml(tx.note)}</div>` : "";
       const metaLine = [tx.date || "", tx.source ? escapeHtml(tx.source) : ""].filter(Boolean).join(" · ");
       return `
-        <div class="tx-item ${typeClass}">
+        <button type="button" class="tx-item tx-item--interactive ${typeClass}" data-tx-id="${Number(tx.id || 0)}">
           <div class="tx-main">
             <span class="tx-type-icon ${tx.type}">${iconText}</span>
             <div class="tx-copy">
@@ -394,8 +586,8 @@ function renderTransactions(items, targetElement, limit = null) {
               ${noteLine}
             </div>
           </div>
-          <strong class="tx-amount">${sign}${money(tx.amount)}</strong>
-        </div>
+          <strong class="tx-amount">${sign}${money(tx.amount, tx.currency || "RUB")}</strong>
+        </button>
       `;
     })
     .join("");
@@ -479,6 +671,112 @@ function buildHistoryQuery(page = 1) {
   }
 
   return params.toString();
+}
+
+function buildHistoryExportQuery() {
+  const params = new URLSearchParams();
+  if (state.history.type !== "all") {
+    params.set("type", state.history.type);
+  }
+  if (state.history.category !== "all") {
+    params.set("category", state.history.category);
+  }
+  if (state.history.dateFrom) {
+    params.set("date_from", state.history.dateFrom);
+  }
+  if (state.history.dateTo) {
+    params.set("date_to", state.history.dateTo);
+  }
+  return params.toString();
+}
+
+function setHistoryExportLoading(isLoading) {
+  if (el.historyExportCsvBtn) {
+    el.historyExportCsvBtn.disabled = isLoading;
+  }
+  if (el.historyExportPdfBtn) {
+    el.historyExportPdfBtn.disabled = isLoading;
+  }
+}
+
+function extractDownloadNameFromDisposition(headerValue, fallbackName) {
+  const raw = String(headerValue || "");
+  if (!raw) {
+    return fallbackName;
+  }
+
+  const utf8Match = raw.match(/filename\*=UTF-8''([^;\n]+)/i);
+  if (utf8Match && utf8Match[1]) {
+    try {
+      return decodeURIComponent(utf8Match[1]).replace(/[\\/:*?"<>|]+/g, "_");
+    } catch (_) {
+      return utf8Match[1].replace(/[\\/:*?"<>|]+/g, "_");
+    }
+  }
+
+  const simpleMatch = raw.match(/filename="?([^";\n]+)"?/i);
+  if (simpleMatch && simpleMatch[1]) {
+    return simpleMatch[1].replace(/[\\/:*?"<>|]+/g, "_");
+  }
+
+  return fallbackName;
+}
+
+function triggerBlobDownload(blob, fileName) {
+  const safeName = String(fileName || "export_file").trim() || "export_file";
+
+  if (typeof navigator !== "undefined" && typeof navigator.msSaveOrOpenBlob === "function") {
+    navigator.msSaveOrOpenBlob(blob, safeName);
+    return;
+  }
+
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = safeName;
+  anchor.rel = "noopener";
+  anchor.style.display = "none";
+  document.body.appendChild(anchor);
+
+  try {
+    anchor.click();
+  } finally {
+    // Revoke with a small delay so browsers have time to start the download.
+    window.setTimeout(() => {
+      URL.revokeObjectURL(url);
+      if (anchor.parentNode) {
+        anchor.parentNode.removeChild(anchor);
+      }
+    }, 1500);
+  }
+}
+
+async function downloadHistoryExport(format) {
+  const normalizedFormat = format === "pdf" ? "pdf" : "csv";
+  readHistoryControls();
+  setHistoryExportLoading(true);
+
+  try {
+    const params = new URLSearchParams(buildHistoryExportQuery());
+    params.set("format", normalizedFormat);
+    params.set("access_token", state.token);
+    params.set("_ts", String(Date.now()));
+    const targetUrl = new URL("/api/transactions/export/download", window.location.origin);
+    targetUrl.search = params.toString();
+
+    const frameId = "exportDownloadFrame";
+    let frame = document.getElementById(frameId);
+    if (!frame) {
+      frame = document.createElement("iframe");
+      frame.id = frameId;
+      frame.style.display = "none";
+      document.body.appendChild(frame);
+    }
+
+    frame.src = targetUrl.toString();
+  } finally {
+    window.setTimeout(() => setHistoryExportLoading(false), 400);
+  }
 }
 
 function getClientSearchResult(items) {
@@ -570,6 +868,10 @@ function updateHistoryCategoryOptions() {
 
   const options = new Map();
   options.set("all", t("history_category_all"));
+
+  FIXED_CATEGORIES.forEach((key) => {
+    options.set(key, capitalizeCategoryLabel(key));
+  });
 
   const collect = (value) => {
     const normalized = String(value || "").trim();
@@ -1102,6 +1404,13 @@ function closeNavMenu() {
   el.navToggleBtn.setAttribute("aria-expanded", "false");
 }
 
+function updateBodyOverlayState() {
+  const hasVisibleOverlay =
+    (el.addOverlay && !el.addOverlay.hidden) ||
+    (el.txDetailsModal && !el.txDetailsModal.hidden);
+  document.body.classList.toggle("overlay-open", Boolean(hasVisibleOverlay));
+}
+
 function openAddOverlay() {
   if (!el.addOverlay || !el.addOverlayBackdrop) {
     return;
@@ -1110,7 +1419,7 @@ function openAddOverlay() {
   setTxMessage("");
   el.addOverlay.hidden = false;
   el.addOverlayBackdrop.hidden = false;
-  document.body.classList.add("overlay-open");
+  updateBodyOverlayState();
 }
 
 function closeAddOverlay() {
@@ -1120,7 +1429,177 @@ function closeAddOverlay() {
 
   el.addOverlay.hidden = true;
   el.addOverlayBackdrop.hidden = true;
-  document.body.classList.remove("overlay-open");
+  setTransactionFormMode(null);
+  updateBodyOverlayState();
+}
+
+function resetReceiptPreview() {
+  if (state.txDetails.receiptObjectUrl) {
+    URL.revokeObjectURL(state.txDetails.receiptObjectUrl);
+    state.txDetails.receiptObjectUrl = "";
+  }
+  if (el.txReceiptPreview) {
+    el.txReceiptPreview.src = "";
+    el.txReceiptPreview.hidden = true;
+  }
+  if (el.txReceiptDownloadBtn) {
+    el.txReceiptDownloadBtn.hidden = true;
+  }
+}
+
+function setTxDetailsMessage(message = "") {
+  if (!el.txDetailsMsg) {
+    return;
+  }
+  el.txDetailsMsg.textContent = message;
+}
+
+function setTxDetailsEditMode(isEditing) {
+  state.txDetails.editMode = Boolean(isEditing);
+
+  const disableFields = !state.txDetails.editMode;
+  if (el.txDetailsAmountInput) {
+    el.txDetailsAmountInput.disabled = disableFields;
+  }
+  if (el.txDetailsCategorySelect) {
+    el.txDetailsCategorySelect.disabled = disableFields;
+  }
+  if (el.txDetailsSourceInput) {
+    el.txDetailsSourceInput.disabled = disableFields;
+  }
+  if (el.txDetailsNoteInput) {
+    el.txDetailsNoteInput.disabled = disableFields;
+  }
+
+  if (el.txEditBtn) {
+    el.txEditBtn.hidden = state.txDetails.editMode;
+  }
+  if (el.txSaveBtn) {
+    el.txSaveBtn.hidden = !state.txDetails.editMode;
+  }
+  if (el.txCancelEditBtn) {
+    el.txCancelEditBtn.hidden = !state.txDetails.editMode;
+  }
+
+  if (state.txDetails.editMode && state.txDetails.data) {
+    const isExpense = state.txDetails.data.type === "expense";
+    if (el.txDetailsCategorySelect) {
+      el.txDetailsCategorySelect.disabled = !isExpense;
+    }
+  }
+}
+
+function populateTxDetailsForm(details) {
+  state.txDetails.data = details;
+  el.txDetailsType.textContent = details.type === "expense" ? t("type_expense") : t("type_income");
+  el.txDetailsCurrency.textContent = details.currency || "RUB";
+  el.txDetailsDate.textContent = detailsValue(details.date);
+
+  if (el.txDetailsAmountInput) {
+    el.txDetailsAmountInput.value = details.amount != null ? String(details.amount) : "";
+  }
+  if (el.txDetailsCategorySelect) {
+    el.txDetailsCategorySelect.value = normalizeCategoryValue(details.category);
+  }
+  if (el.txDetailsSourceInput) {
+    el.txDetailsSourceInput.value = details.source || "";
+  }
+  if (el.txDetailsNoteInput) {
+    el.txDetailsNoteInput.value = details.note || "";
+  }
+}
+
+function detailsValue(value) {
+  const text = String(value == null ? "" : value).trim();
+  return text || "-";
+}
+
+async function fetchReceiptBlob(transactionId) {
+  const response = await fetch(`/api/transactions/${transactionId}/receipt`, {
+    headers: {
+      Authorization: `Bearer ${state.token}`,
+    },
+  });
+
+  if (!response.ok) {
+    throw new Error(t("details_receipt_load_failed"));
+  }
+
+  return response.blob();
+}
+
+async function renderReceiptPreview(transactionId, hasReceipt) {
+  resetReceiptPreview();
+
+  if (!hasReceipt) {
+    el.txReceiptHint.textContent = t("details_receipt_missing");
+    return;
+  }
+
+  try {
+    const blob = await fetchReceiptBlob(transactionId);
+    state.txDetails.receiptObjectUrl = URL.createObjectURL(blob);
+    el.txReceiptPreview.src = state.txDetails.receiptObjectUrl;
+    el.txReceiptPreview.hidden = false;
+    el.txReceiptDownloadBtn.hidden = false;
+    el.txReceiptHint.textContent = t("details_receipt_attached");
+  } catch (error) {
+    el.txReceiptHint.textContent = error.message || t("details_receipt_load_failed");
+  }
+}
+
+function openTxDetailsModal() {
+  if (!el.txDetailsModal || !el.txDetailsBackdrop) {
+    return;
+  }
+  el.txDetailsModal.hidden = false;
+  el.txDetailsBackdrop.hidden = false;
+  updateBodyOverlayState();
+}
+
+function closeTxDetailsModal() {
+  if (!el.txDetailsModal || !el.txDetailsBackdrop) {
+    return;
+  }
+
+  state.txDetails.transactionId = null;
+  state.txDetails.data = null;
+  setTxDetailsMessage("");
+  resetReceiptPreview();
+  if (el.txReceiptInput) {
+    el.txReceiptInput.value = "";
+  }
+
+  el.txDetailsModal.hidden = true;
+  el.txDetailsBackdrop.hidden = true;
+  setTxDetailsEditMode(false);
+  updateBodyOverlayState();
+}
+
+async function openTransactionDetails(transactionId) {
+  const resolvedId = Number(transactionId || 0);
+  if (!resolvedId) {
+    return;
+  }
+
+  state.txDetails.transactionId = resolvedId;
+  state.txDetails.loading = true;
+  openTxDetailsModal();
+  setTxDetailsMessage(t("details_loading"));
+
+  try {
+    const details = await api(`/api/transactions/${resolvedId}`);
+    populateTxDetailsForm(details);
+    setTxDetailsEditMode(false);
+
+    await renderReceiptPreview(resolvedId, Boolean(details.receipt_attached));
+    setTxDetailsMessage("");
+  } catch (error) {
+    setTxDetailsMessage(error.message || t("details_load_failed"));
+    resetReceiptPreview();
+  } finally {
+    state.txDetails.loading = false;
+  }
 }
 
 function getBuiltInTemplates() {
@@ -1128,17 +1607,17 @@ function getBuiltInTemplates() {
     {
       id: "coffee",
       name: t("template_coffee"),
-      payload: { type: "expense", amount: 4, category: t("template_value_coffee"), source: "", note: "" },
+      payload: { type: "expense", amount: 4, currency: "RUB", category: "food", source: "", note: "" },
     },
     {
       id: "transport",
       name: t("template_transport"),
-      payload: { type: "expense", amount: 8, category: t("template_value_transport"), source: "", note: "" },
+      payload: { type: "expense", amount: 8, currency: "RUB", category: "transport", source: "", note: "" },
     },
     {
       id: "stipend",
       name: t("template_stipend"),
-      payload: { type: "income", amount: 150, category: "", source: t("template_value_stipend"), note: "" },
+      payload: { type: "income", amount: 150, currency: "RUB", category: "", source: t("template_value_stipend"), note: "" },
     },
   ];
 }
@@ -1225,16 +1704,32 @@ function setGoalMessage(message = "") {
   messageEl.textContent = message;
 }
 
+function setTransactionFormMode(editingTransactionId = null) {
+  state.editingTransactionId = editingTransactionId ? Number(editingTransactionId) : null;
+  const isEditing = Boolean(state.editingTransactionId);
+
+  if (el.addOverlayTitle) {
+    el.addOverlayTitle.textContent = isEditing ? t("edit_transaction") : t("add_transaction");
+  }
+
+  if (el.txSubmitBtn) {
+    el.txSubmitBtn.textContent = isEditing ? t("save_changes") : t("save");
+  }
+}
+
 function applyTransactionTemplate(payload) {
   if (!payload) {
     return;
   }
 
+  setTransactionFormMode(null);
   el.txType.value = payload.type || "expense";
   el.txAmount.value = payload.amount != null ? String(payload.amount) : "";
-  el.txCategory.value = payload.category || "";
+  el.txCurrency.value = payload.currency || "RUB";
+  el.txCategory.value = normalizeCategoryValue(payload.category);
   el.txSource.value = payload.source || "";
   el.txNote.value = payload.note || "";
+  syncCategoryAndSourceByType();
   validateAmountInput();
   openAddOverlay();
   el.txAmount.focus();
@@ -1288,7 +1783,8 @@ function createCustomTemplate() {
     payload: {
       type: el.txType.value,
       amount: amountValue,
-      category: el.txCategory.value.trim(),
+      currency: (el.txCurrency.value || "RUB").toUpperCase(),
+      category: normalizeCategoryValue(el.txCategory.value),
       source: el.txSource.value.trim(),
       note: el.txNote.value.trim(),
     },
@@ -1325,7 +1821,7 @@ function setView(viewKey) {
   closeNavMenu();
 
   if (viewKey === "analytics") {
-    drawBars(el.categoryChart, state.categories);
+    renderCategoryChart();
     drawLine(el.timelineChart, state.timeline);
     renderAdvancedAnalytics();
   }
@@ -1371,15 +1867,15 @@ async function refreshDashboard() {
   syncAchievementControls();
   renderAchievementsPanel();
   renderAdvancedAnalytics();
-  drawBars(el.categoryChart, state.categories);
+  renderCategoryChart();
   drawLine(el.timelineChart, state.timeline);
 }
 
 function applyQuickAction(actionKey) {
   const presets = {
-    coffee: { type: "expense", amount: 4, category: t("template_value_coffee"), source: "", note: "" },
-    transport: { type: "expense", amount: 8, category: t("template_value_transport"), source: "", note: "" },
-    income: { type: "income", amount: 150, category: "", source: t("template_value_stipend"), note: "" },
+    coffee: { type: "expense", amount: 4, currency: "RUB", category: "food", source: "", note: "" },
+    transport: { type: "expense", amount: 8, currency: "RUB", category: "transport", source: "", note: "" },
+    income: { type: "income", amount: 150, currency: "RUB", category: "", source: t("template_value_stipend"), note: "" },
   };
 
   const preset = presets[actionKey];
@@ -1472,24 +1968,52 @@ el.txForm.addEventListener("submit", async (event) => {
     return;
   }
 
+  const txType = el.txType.value;
+  const normalizedCategory = normalizeCategoryValue(el.txCategory.value);
+  if (txType === "expense" && !normalizedCategory) {
+    setTxMessage(t("category_required_for_expense"));
+    el.txCategory.focus();
+    return;
+  }
+
   const payload = {
-    type: el.txType.value,
+    type: txType,
     amount: amountValue,
-    category: capitalizeCategoryLabel(el.txCategory.value) || null,
+    currency: (el.txCurrency.value || "RUB").toUpperCase(),
+    category: txType === "expense" ? normalizedCategory : null,
     source: el.txSource.value.trim() || null,
     note: el.txNote.value.trim() || null,
     date: el.txDate.value || null,
   };
 
   try {
-    const result = await api("/api/transactions", {
-      method: "POST",
+    const isEditing = Boolean(state.editingTransactionId);
+    const path = isEditing ? `/api/transactions/${state.editingTransactionId}` : "/api/transactions";
+    const method = isEditing ? "PATCH" : "POST";
+
+    const result = await api(path, {
+      method,
       body: JSON.stringify(payload),
     });
 
+    const receiptFile = el.txReceiptAddInput && el.txReceiptAddInput.files ? el.txReceiptAddInput.files[0] : null;
+    if (!isEditing && receiptFile && result.transaction && result.transaction.id) {
+      const receiptForm = new FormData();
+      receiptForm.append("file", receiptFile);
+      await api(`/api/transactions/${result.transaction.id}/receipt`, {
+        method: "POST",
+        body: receiptForm,
+      });
+    }
+
     el.txForm.reset();
+    if (el.txReceiptAddInput) {
+      el.txReceiptAddInput.value = "";
+    }
+    syncCategoryAndSourceByType();
     const warningKey = result.warning_key ? String(result.warning_key).trim() : "";
-    const responseMessage = warningKey ? t(warningKey) : (result.warning || t("saved"));
+    const defaultMessage = isEditing ? t("details_updated") : t("saved");
+    const responseMessage = warningKey ? t(warningKey) : (result.warning || defaultMessage);
     setTxMessage(responseMessage);
     validateAmountInput();
     closeAddOverlay();
@@ -1519,9 +2043,15 @@ el.goalForm.addEventListener("submit", (event) => {
 
 el.txAmount.addEventListener("input", validateAmountInput);
 
+el.txType.addEventListener("change", () => {
+  syncCategoryAndSourceByType();
+});
+
 window.addEventListener("warkla:langchange", () => {
   renderFloatingAddLabel();
   renderTemplateLists();
+  setTransactionFormMode(state.editingTransactionId);
+  syncCategoryAndSourceByType();
 
   if (state.dashboard) {
     renderGoalWidget(state.dashboard);
@@ -1533,7 +2063,7 @@ window.addEventListener("warkla:langchange", () => {
     syncAchievementControls();
     renderAchievementsPanel();
     renderAdvancedAnalytics();
-    drawBars(el.categoryChart, state.categories);
+    renderCategoryChart();
     drawLine(el.timelineChart, state.timeline);
   }
 
@@ -1579,6 +2109,28 @@ if (el.historyLoadMoreBtn) {
       return;
     }
     await loadHistoryPage(state.history.page + 1, true);
+  });
+}
+
+if (el.historyExportCsvBtn) {
+  el.historyExportCsvBtn.addEventListener("click", async () => {
+    try {
+      await downloadHistoryExport("csv");
+      setTxMessage(t("history_export_ready"));
+    } catch (error) {
+      setTxMessage(error.message || t("history_export_failed"));
+    }
+  });
+}
+
+if (el.historyExportPdfBtn) {
+  el.historyExportPdfBtn.addEventListener("click", async () => {
+    try {
+      await downloadHistoryExport("pdf");
+      setTxMessage(t("history_export_ready"));
+    } catch (error) {
+      setTxMessage(error.message || t("history_export_failed"));
+    }
   });
 }
 
@@ -1668,6 +2220,19 @@ document.addEventListener("click", (event) => {
     closeAddOverlay();
   }
 
+  if (el.txDetailsModal && el.txDetailsBackdrop && !el.txDetailsModal.hidden && target === el.txDetailsBackdrop) {
+    closeTxDetailsModal();
+  }
+
+  const txItem = target.closest("[data-tx-id]");
+  if (txItem) {
+    const txId = Number(txItem.getAttribute("data-tx-id") || 0);
+    if (txId > 0) {
+      openTransactionDetails(txId);
+      return;
+    }
+  }
+
   const deleteButton = target.closest("[data-template-delete]");
   if (deleteButton) {
     removeCustomTemplate(deleteButton.dataset.templateDelete);
@@ -1700,10 +2265,170 @@ document.addEventListener("keydown", (event) => {
     closeProfilePopover();
     closeNavMenu();
     closeAddOverlay();
+    closeTxDetailsModal();
   }
 });
 
+if (el.txDetailsCloseBtn) {
+  el.txDetailsCloseBtn.addEventListener("click", () => {
+    closeTxDetailsModal();
+  });
+}
+
+if (el.txReceiptUploadBtn) {
+  el.txReceiptUploadBtn.addEventListener("click", async () => {
+    const txId = Number(state.txDetails.transactionId || 0);
+    if (!txId) {
+      return;
+    }
+
+    const file = el.txReceiptInput && el.txReceiptInput.files ? el.txReceiptInput.files[0] : null;
+    if (!file) {
+      setTxDetailsMessage(t("select_image_first"));
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append("file", file);
+
+    try {
+      await api(`/api/transactions/${txId}/receipt`, {
+        method: "POST",
+        body: formData,
+      });
+      setTxDetailsMessage(t("details_receipt_uploaded"));
+      await openTransactionDetails(txId);
+      await refreshDashboard();
+    } catch (error) {
+      setTxDetailsMessage(error.message || t("details_receipt_upload_failed"));
+    }
+  });
+}
+
+if (el.txReceiptDownloadBtn) {
+  el.txReceiptDownloadBtn.addEventListener("click", async () => {
+    const txId = Number(state.txDetails.transactionId || 0);
+    if (!txId) {
+      return;
+    }
+
+    try {
+      const blob = await fetchReceiptBlob(txId);
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      const extByMime = {
+        "image/png": "png",
+        "image/webp": "webp",
+        "image/jpeg": "jpg",
+      };
+      const ext = extByMime[(blob.type || "").toLowerCase()] || "jpg";
+      anchor.download = `receipt_${txId}.${ext}`;
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      setTxDetailsMessage(error.message || t("details_receipt_load_failed"));
+    }
+  });
+}
+
+if (el.txEditBtn) {
+  el.txEditBtn.addEventListener("click", () => {
+    if (!state.txDetails.data) {
+      return;
+    }
+
+    setTxDetailsEditMode(true);
+    if (el.txDetailsAmountInput) {
+      el.txDetailsAmountInput.focus();
+    }
+  });
+}
+
+if (el.txCancelEditBtn) {
+  el.txCancelEditBtn.addEventListener("click", () => {
+    if (!state.txDetails.data) {
+      return;
+    }
+
+    populateTxDetailsForm(state.txDetails.data);
+    setTxDetailsEditMode(false);
+    setTxDetailsMessage("");
+  });
+}
+
+if (el.txSaveBtn) {
+  el.txSaveBtn.addEventListener("click", async () => {
+    const txId = Number(state.txDetails.transactionId || 0);
+    if (!txId || !state.txDetails.data) {
+      return;
+    }
+
+    const amountValue = Number(el.txDetailsAmountInput ? el.txDetailsAmountInput.value : 0);
+    if (!Number.isFinite(amountValue) || amountValue <= 0) {
+      setTxDetailsMessage(t("amount_validation_error"));
+      return;
+    }
+
+    const isExpense = state.txDetails.data.type === "expense";
+    const normalizedCategory = normalizeCategoryValue(el.txDetailsCategorySelect ? el.txDetailsCategorySelect.value : "");
+    if (isExpense && !normalizedCategory) {
+      setTxDetailsMessage(t("category_required_for_expense"));
+      return;
+    }
+
+    const payload = {
+      amount: amountValue,
+      category: isExpense ? normalizedCategory : null,
+      source: el.txDetailsSourceInput ? el.txDetailsSourceInput.value.trim() || null : null,
+      note: el.txDetailsNoteInput ? el.txDetailsNoteInput.value.trim() || null : null,
+    };
+
+    try {
+      const result = await api(`/api/transactions/${txId}`, {
+        method: "PATCH",
+        body: JSON.stringify(payload),
+      });
+      const updated = result.transaction || (await api(`/api/transactions/${txId}`));
+      populateTxDetailsForm(updated);
+      setTxDetailsEditMode(false);
+      setTxDetailsMessage(t("details_updated"));
+      await refreshDashboard();
+    } catch (error) {
+      setTxDetailsMessage(error.message || t("details_load_failed"));
+    }
+  });
+}
+
+if (el.txDeleteBtn) {
+  el.txDeleteBtn.addEventListener("click", async () => {
+    const txId = Number(state.txDetails.transactionId || 0);
+    if (!txId) {
+      return;
+    }
+
+    if (!window.confirm(t("details_delete_confirm"))) {
+      return;
+    }
+
+    try {
+      await api(`/api/transactions/${txId}`, {
+        method: "DELETE",
+      });
+      closeTxDetailsModal();
+      await refreshDashboard();
+      setTxMessage(t("details_deleted"));
+    } catch (error) {
+      setTxDetailsMessage(error.message || t("details_delete_failed"));
+    }
+  });
+}
+
 el.emptyStateAddBtn.addEventListener("click", () => {
+  setTransactionFormMode(null);
+  syncCategoryAndSourceByType();
   openAddOverlay();
   el.txAmount.focus();
 });
@@ -1724,6 +2449,8 @@ el.goAchievementsBtn.addEventListener("click", () => {
 
 if (el.floatingAddBtn) {
   el.floatingAddBtn.addEventListener("click", () => {
+    setTransactionFormMode(null);
+    syncCategoryAndSourceByType();
     openAddOverlay();
     el.txAmount.focus();
   });
@@ -1745,10 +2472,24 @@ let resizeTimer = null;
 window.addEventListener("resize", () => {
   window.clearTimeout(resizeTimer);
   resizeTimer = window.setTimeout(() => {
-    drawBars(el.categoryChart, state.categories);
+    renderCategoryChart();
     drawLine(el.timelineChart, state.timeline);
   }, 120);
 });
+
+if (el.categoryChartPieBtn) {
+  el.categoryChartPieBtn.addEventListener("click", () => {
+    state.categoryChartMode = "pie";
+    renderCategoryChart();
+  });
+}
+
+if (el.categoryChartBarBtn) {
+  el.categoryChartBarBtn.addEventListener("click", () => {
+    state.categoryChartMode = "bar";
+    renderCategoryChart();
+  });
+}
 
 (async function bootstrap() {
   if (!state.token) {
@@ -1760,6 +2501,8 @@ window.addEventListener("resize", () => {
   state.customTemplates = loadCustomTemplates();
   renderFloatingAddLabel();
   renderTemplateLists();
+  setTransactionFormMode(null);
+  syncCategoryAndSourceByType();
   closeAddOverlay();
   el.profileAvatarMini.src = defaultAvatarDataUrl();
   syncAchievementControls();

@@ -34,6 +34,7 @@ class Transaction(db.Model):
     user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False, index=True)
     tx_type = db.Column(db.String(20), nullable=False, index=True)
     amount = db.Column(db.Numeric(10, 2), nullable=False)
+    currency = db.Column(db.String(3), nullable=False, default="RUB")
     category = db.Column(db.String(64), nullable=True, index=True)
     source = db.Column(db.String(128), nullable=True)
     note = db.Column(db.String(255), nullable=True)
@@ -54,6 +55,7 @@ class Transaction(db.Model):
             "id": self.id,
             "type": self.tx_type,
             "amount": amount_value,
+            "currency": self.currency,
             "category": self.category,
             "source": self.source,
             "note": self.note,

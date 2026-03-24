@@ -3,9 +3,18 @@ from pathlib import Path
 
 from flask import Flask, jsonify, send_from_directory
 from flask_cors import CORS
+from sqlalchemy import inspect, text
 
 from app.config import config_map
 from app.extensions import db, jwt, migrate
+
+
+def _ensure_currency_column(app: Flask) -> None:
+    with app.app_context():
+        columns = {col["name"] for col in inspect(db.engine).get_columns("transactions")}
+        if "currency" not in columns:
+            db.session.execute(text("ALTER TABLE transactions ADD COLUMN currency VARCHAR(3) NOT NULL DEFAULT 'RUB'"))
+            db.session.commit()
 
 
 def create_app(config_name: str | None = None) -> Flask:
@@ -39,6 +48,7 @@ def create_app(config_name: str | None = None) -> Flask:
 
     with app.app_context():
         db.create_all()
+        _ensure_currency_column(app)
         seed_achievements()
 
     @app.errorhandler(400)
