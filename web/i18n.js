@@ -15,7 +15,10 @@
       income_operations_5: { title: "Income Logger", description: "Add 5 income transactions." },
       categories_5: { title: "Diversified Spending", description: "Use 5 expense categories." },
       total_expense_500: { title: "Major Spender", description: "Reach 500 total expenses." },
-      single_expense_100: { title: "Big Purchase", description: "Log one expense for 100 or more." }
+      single_expense_100: { title: "Big Purchase", description: "Log one expense for 100 or more." },
+      thrifty_7_days: { title: "Thrifty", description: "Keep 7 straight days without breaking your daily budget limit." },
+      survived_to_stipend: { title: "Survived to Stipend", description: "Reach stipend day with a non-negative balance." },
+      discount_master_10: { title: "Discount Master", description: "Log 10 expense purchases made with discounts." }
     },
     ru: {
       operations_1: { title: "Первый шаг", description: "Добавь первую операцию." },
@@ -30,7 +33,10 @@
       income_operations_5: { title: "Доходный поток", description: "Добавь 5 доходных операций." },
       categories_5: { title: "Баланс категорий", description: "Используй 5 разных категорий расходов." },
       total_expense_500: { title: "Крупные траты", description: "Накопи 500 суммарных расходов." },
-      single_expense_100: { title: "Серьезная покупка", description: "Сделай одну расходную операцию на 100 или больше." }
+      single_expense_100: { title: "Серьезная покупка", description: "Сделай одну расходную операцию на 100 или больше." },
+      thrifty_7_days: { title: "Экономный", description: "Проведи 7 дней подряд без превышения дневного лимита." },
+      survived_to_stipend: { title: "Дожил до стипендии", description: "В день стипендии сохрани баланс не ниже нуля." },
+      discount_master_10: { title: "Мастер скидок", description: "Сделай 10 расходных покупок со скидкой." }
     }
   };
 
@@ -112,6 +118,7 @@
       amount: "Amount",
       currency: "Currency",
       category: "Category",
+      discount_purchase: "Purchase with discount",
       category_not_selected: "Not selected",
       category_food: "Food",
       category_transport: "Transport",
@@ -231,11 +238,16 @@
       details_receipt_load_failed: "Failed to load receipt.",
       details_receipt_uploaded: "Receipt uploaded.",
       details_receipt_upload_failed: "Failed to upload receipt.",
+      details_discount_purchase: "Marked as discounted",
       details_delete_confirm: "Delete this transaction? This action cannot be undone.",
       details_deleted: "Transaction deleted.",
       details_delete_failed: "Failed to delete transaction.",
       details_updated: "Transaction updated.",
-      category_required_for_expense: "Category is required for expense."
+      category_required_for_expense: "Category is required for expense.",
+      notification_achievement_unlocked: "Achievement unlocked",
+      nudge_warning_budget_depleted: "The budget tank is blinking red, but you can still save the run. Try a tiny spend-free streak today.",
+      nudge_warning_daily_limit_exceeded: "Daily limit exceeded. No panic: one lean day can pull the balance back in line.",
+      nudge_warning_negative_forecast: "Forecast dipped below zero. Small cuts now can save a lot by stipend day."
     },
     ru: {
       menu: "Меню",
@@ -314,6 +326,7 @@
       amount: "Сумма",
       currency: "Валюта",
       category: "Категория",
+      discount_purchase: "Покупка со скидкой",
       category_not_selected: "Не выбрано",
       category_food: "Еда",
       category_transport: "Транспорт",
@@ -433,11 +446,16 @@
       details_receipt_load_failed: "Не удалось загрузить чек.",
       details_receipt_uploaded: "Чек загружен.",
       details_receipt_upload_failed: "Не удалось загрузить чек.",
+      details_discount_purchase: "Отмечено как скидочная покупка",
       details_delete_confirm: "Удалить эту операцию? Действие нельзя отменить.",
       details_deleted: "Операция удалена.",
       details_delete_failed: "Не удалось удалить операцию.",
       details_updated: "Операция обновлена.",
-      category_required_for_expense: "Для расхода нужно выбрать категорию."
+      category_required_for_expense: "Для расхода нужно выбрать категорию.",
+      notification_achievement_unlocked: "Открыто достижение",
+      nudge_warning_budget_depleted: "Бюджет мигает красным, но матч еще можно вытащить. Попробуйте день без лишних трат.",
+      nudge_warning_daily_limit_exceeded: "Дневной лимит превышен. Спокойно: один аккуратный день вернет контроль.",
+      nudge_warning_negative_forecast: "Прогноз ушел в минус. Небольшие сокращения сегодня заметно помогут к стипендии."
     }
   };
 

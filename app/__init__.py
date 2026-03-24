@@ -3,6 +3,7 @@ from pathlib import Path
 
 from flask import Flask, jsonify, send_from_directory
 from flask_cors import CORS
+from sqlalchemy.exc import OperationalError
 from sqlalchemy import inspect, text
 
 from app.config import config_map
@@ -13,8 +14,14 @@ def _ensure_currency_column(app: Flask) -> None:
     with app.app_context():
         columns = {col["name"] for col in inspect(db.engine).get_columns("transactions")}
         if "currency" not in columns:
-            db.session.execute(text("ALTER TABLE transactions ADD COLUMN currency VARCHAR(3) NOT NULL DEFAULT 'RUB'"))
-            db.session.commit()
+            try:
+                db.session.execute(text("ALTER TABLE transactions ADD COLUMN currency VARCHAR(3) NOT NULL DEFAULT 'RUB'"))
+                db.session.commit()
+            except OperationalError as exc:
+                db.session.rollback()
+                # Dev reloader / multi-process boot can race here; ignore duplicate column only.
+                if "duplicate column name" not in str(exc).lower():
+                    raise
 
 
 def create_app(config_name: str | None = None) -> Flask:

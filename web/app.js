@@ -43,6 +43,9 @@ const state = {
     data: null,
   },
   editingTransactionId: null,
+  notifications: {
+    dedupeMap: {},
+  },
 };
 
 const t = window.I18N ? window.I18N.t : (key) => key;
@@ -146,6 +149,7 @@ const el = {
   txCurrency: document.getElementById("txCurrency"),
   txAmountHint: document.getElementById("txAmountHint"),
   txCategory: document.getElementById("txCategory"),
+  txDiscount: document.getElementById("txDiscount"),
   txSource: document.getElementById("txSource"),
   txDate: document.getElementById("txDate"),
   txNote: document.getElementById("txNote"),
@@ -211,6 +215,7 @@ const el = {
   txDetailsAmountInput: document.getElementById("txDetailsAmountInput"),
   txDetailsCurrency: document.getElementById("txDetailsCurrency"),
   txDetailsCategorySelect: document.getElementById("txDetailsCategorySelect"),
+  txDetailsDiscount: document.getElementById("txDetailsDiscount"),
   txDetailsSourceInput: document.getElementById("txDetailsSourceInput"),
   txDetailsDate: document.getElementById("txDetailsDate"),
   txDetailsNoteInput: document.getElementById("txDetailsNoteInput"),
@@ -225,6 +230,7 @@ const el = {
   txDeleteBtn: document.getElementById("txDeleteBtn"),
   categoryChartPieBtn: document.getElementById("categoryChartPieBtn"),
   categoryChartBarBtn: document.getElementById("categoryChartBarBtn"),
+  toastStack: document.getElementById("toastStack"),
 };
 
 function escapeHtml(value) {
@@ -287,6 +293,111 @@ function syncCategoryAndSourceByType() {
   if (isExpense) {
     el.txSource.value = "";
   }
+
+  if (el.txDiscount) {
+    el.txDiscount.disabled = !isExpense;
+    if (!isExpense) {
+      el.txDiscount.checked = false;
+    }
+  }
+}
+
+function notifyInApp(message, options = {}) {
+  const text = String(message || "").trim();
+  if (!text || !el.toastStack) {
+    return;
+  }
+
+  const level = ["info", "success", "warning", "danger"].includes(options.level)
+    ? options.level
+    : "info";
+  const dedupeKey = String(options.dedupeKey || "").trim();
+  const now = Date.now();
+
+  if (dedupeKey) {
+    const lastShown = Number(state.notifications.dedupeMap[dedupeKey] || 0);
+    if (now - lastShown < 5000) {
+      return;
+    }
+    state.notifications.dedupeMap[dedupeKey] = now;
+  }
+
+  const toast = document.createElement("div");
+  toast.className = `in-app-toast is-${level}`;
+  toast.setAttribute("role", "status");
+  toast.textContent = text;
+
+  el.toastStack.appendChild(toast);
+  requestAnimationFrame(() => {
+    toast.classList.add("is-visible");
+  });
+
+  const removeToast = () => {
+    toast.classList.remove("is-visible");
+    window.setTimeout(() => {
+      if (toast.parentNode) {
+        toast.parentNode.removeChild(toast);
+      }
+    }, 170);
+  };
+
+  toast.addEventListener("click", removeToast);
+  window.setTimeout(removeToast, 5200);
+}
+
+function resolveNudgeText(warningKey, fallbackText = "") {
+  const key = String(warningKey || "").trim();
+  if (!key) {
+    return String(fallbackText || "").trim();
+  }
+
+  const nudgeKey = `nudge_${key}`;
+  const translatedNudge = t(nudgeKey);
+  if (translatedNudge && translatedNudge !== nudgeKey) {
+    return translatedNudge;
+  }
+
+  const translatedWarning = t(key);
+  if (translatedWarning && translatedWarning !== key) {
+    return translatedWarning;
+  }
+
+  return String(fallbackText || "").trim();
+}
+
+function notifyAchievements(unlockedItems = []) {
+  if (!Array.isArray(unlockedItems) || !unlockedItems.length) {
+    return;
+  }
+
+  unlockedItems.forEach((item) => {
+    const title = String(item || "").trim();
+    if (!title) {
+      return;
+    }
+    notifyInApp(`${t("notification_achievement_unlocked")}: ${title}`, {
+      level: "success",
+      dedupeKey: `achievement-${title.toLowerCase()}`,
+    });
+  });
+}
+
+function notifyBudgetWarning(result = {}) {
+  const warningStatus = String(result.warning_status || "").trim();
+  if (!warningStatus || warningStatus === "success") {
+    return;
+  }
+
+  const warningKey = String(result.warning_key || "").trim();
+  const resolvedText = resolveNudgeText(warningKey, result.warning || "");
+  if (!resolvedText) {
+    return;
+  }
+
+  notifyInApp(resolvedText, {
+    level: warningStatus,
+    dedupeKey: `warning-${warningStatus}-${warningKey}`,
+  });
 }
 
 async function api(path, options = {}) {
@@ -1467,6 +1578,9 @@ function setTxDetailsEditMode(isEditing) {
   if (el.txDetailsSourceInput) {
     el.txDetailsSourceInput.disabled = disableFields;
   }
+  if (el.txDetailsDiscount) {
+    el.txDetailsDiscount.disabled = disableFields;
+  }
   if (el.txDetailsNoteInput) {
     el.txDetailsNoteInput.disabled = disableFields;
   }
@@ -1486,6 +1600,12 @@ function setTxDetailsEditMode(isEditing) {
     if (el.txDetailsCategorySelect) {
       el.txDetailsCategorySelect.disabled = !isExpense;
     }
+    if (el.txDetailsDiscount) {
+      el.txDetailsDiscount.disabled = !isExpense;
+      if (!isExpense) {
+        el.txDetailsDiscount.checked = false;
+      }
+    }
   }
 }
 
@@ -1500,6 +1620,9 @@ function populateTxDetailsForm(details) {
   }
   if (el.txDetailsCategorySelect) {
     el.txDetailsCategorySelect.value = normalizeCategoryValue(details.category);
+  }
+  if (el.txDetailsDiscount) {
+    el.txDetailsDiscount.checked = details.type === "expense" && Boolean(details.is_discount);
   }
   if (el.txDetailsSourceInput) {
     el.txDetailsSourceInput.value = details.source || "";
@@ -1727,6 +1850,9 @@ function applyTransactionTemplate(payload) {
   el.txAmount.value = payload.amount != null ? String(payload.amount) : "";
   el.txCurrency.value = payload.currency || "RUB";
   el.txCategory.value = normalizeCategoryValue(payload.category);
+  if (el.txDiscount) {
+    el.txDiscount.checked = Boolean(payload.is_discount);
+  }
   el.txSource.value = payload.source || "";
   el.txNote.value = payload.note || "";
   syncCategoryAndSourceByType();
@@ -1785,6 +1911,7 @@ function createCustomTemplate() {
       amount: amountValue,
       currency: (el.txCurrency.value || "RUB").toUpperCase(),
       category: normalizeCategoryValue(el.txCategory.value),
+      is_discount: el.txType.value === "expense" && Boolean(el.txDiscount && el.txDiscount.checked),
       source: el.txSource.value.trim(),
       note: el.txNote.value.trim(),
     },
@@ -1873,9 +2000,9 @@ async function refreshDashboard() {
 
 function applyQuickAction(actionKey) {
   const presets = {
-    coffee: { type: "expense", amount: 4, currency: "RUB", category: "food", source: "", note: "" },
-    transport: { type: "expense", amount: 8, currency: "RUB", category: "transport", source: "", note: "" },
-    income: { type: "income", amount: 150, currency: "RUB", category: "", source: t("template_value_stipend"), note: "" },
+    coffee: { type: "expense", amount: 4, currency: "RUB", category: "food", is_discount: false, source: "", note: "" },
+    transport: { type: "expense", amount: 8, currency: "RUB", category: "transport", is_discount: false, source: "", note: "" },
+    income: { type: "income", amount: 150, currency: "RUB", category: "", is_discount: false, source: t("template_value_stipend"), note: "" },
   };
 
   const preset = presets[actionKey];
@@ -1981,6 +2108,7 @@ el.txForm.addEventListener("submit", async (event) => {
     amount: amountValue,
     currency: (el.txCurrency.value || "RUB").toUpperCase(),
     category: txType === "expense" ? normalizedCategory : null,
+    is_discount: txType === "expense" && Boolean(el.txDiscount && el.txDiscount.checked),
     source: el.txSource.value.trim() || null,
     note: el.txNote.value.trim() || null,
     date: el.txDate.value || null,
@@ -2015,6 +2143,8 @@ el.txForm.addEventListener("submit", async (event) => {
     const defaultMessage = isEditing ? t("details_updated") : t("saved");
     const responseMessage = warningKey ? t(warningKey) : (result.warning || defaultMessage);
     setTxMessage(responseMessage);
+    notifyAchievements(result.new_achievements || []);
+    notifyBudgetWarning(result);
     validateAmountInput();
     closeAddOverlay();
     await refreshDashboard();
@@ -2382,6 +2512,7 @@ if (el.txSaveBtn) {
     const payload = {
       amount: amountValue,
       category: isExpense ? normalizedCategory : null,
+      is_discount: isExpense && Boolean(el.txDetailsDiscount && el.txDetailsDiscount.checked),
       source: el.txDetailsSourceInput ? el.txDetailsSourceInput.value.trim() || null : null,
       note: el.txDetailsNoteInput ? el.txDetailsNoteInput.value.trim() || null : null,
     };
@@ -2395,6 +2526,8 @@ if (el.txSaveBtn) {
       populateTxDetailsForm(updated);
       setTxDetailsEditMode(false);
       setTxDetailsMessage(t("details_updated"));
+      notifyAchievements(result.new_achievements || []);
+      notifyBudgetWarning(result);
       await refreshDashboard();
     } catch (error) {
       setTxDetailsMessage(error.message || t("details_load_failed"));

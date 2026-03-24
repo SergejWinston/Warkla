@@ -308,6 +308,12 @@
           <option value="other" data-i18n="category_other">Other</option>
         </select>
       </div>
+      <div class="row row-inline">
+        <label class="checkbox-inline" for="txDiscount">
+          <input id="txDiscount" type="checkbox" />
+          <span data-i18n="discount_purchase">Purchase with discount</span>
+        </label>
+      </div>
       <div class="row">
         <label for="txSource" data-i18n="source">Source</label>
         <input id="txSource" type="text" placeholder="scholarship" data-i18n-placeholder="placeholder_source" />
@@ -371,6 +377,13 @@
         </select>
       </div>
       <div class="tx-details-item">
+        <span data-i18n="discount_purchase">Purchase with discount</span>
+        <label class="checkbox-inline" for="txDetailsDiscount">
+          <input id="txDetailsDiscount" type="checkbox" disabled />
+          <span data-i18n="details_discount_purchase">Marked as discounted</span>
+        </label>
+      </div>
+      <div class="tx-details-item">
         <span data-i18n="source">Source</span>
         <input id="txDetailsSourceInput" type="text" maxlength="128" disabled />
       </div>
@@ -402,6 +415,8 @@
       <button id="txDeleteBtn" class="ghost danger" type="button" data-i18n="details_delete_transaction">Delete transaction</button>
     </div>
   </section>
+
+  <div id="toastStack" class="toast-stack" aria-live="polite" aria-atomic="false"></div>
 
   <script src="/i18n.js" defer></script>
   <script src="/app.js" defer></script>

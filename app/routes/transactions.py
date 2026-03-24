@@ -92,6 +92,22 @@ def _parse_date(raw: str | None):
         return None
 
 
+def _parse_bool(raw) -> bool | None:
+    if isinstance(raw, bool):
+        return raw
+    if isinstance(raw, (int, float)):
+        if raw in {0, 1}:
+            return bool(raw)
+        return None
+    if isinstance(raw, str):
+        normalized = raw.strip().lower()
+        if normalized in {"1", "true", "yes", "on"}:
+            return True
+        if normalized in {"0", "false", "no", "off"}:
+            return False
+    return None
+
+
 def _normalize_category(raw: str | None) -> str | None:
     normalized = (raw or "").strip().lower()
     if not normalized:
@@ -237,6 +253,12 @@ def create_transaction():
     category = (data.get("category") or "").strip() or None
     source = (data.get("source") or "").strip() or None
     note = (data.get("note") or "").strip() or None
+    is_discount = False
+    if "is_discount" in data:
+        parsed_discount = _parse_bool(data.get("is_discount"))
+        if parsed_discount is None:
+            return jsonify({"error": "is_discount must be a boolean"}), 400
+        is_discount = parsed_discount
     tx_date = _parse_date(data.get("date"))
 
     if tx_type not in {"income", "expense"}:
@@ -263,6 +285,8 @@ def create_transaction():
 
     if tx_type == "income" and not source:
         source = "Не указан"
+    if tx_type != "expense":
+        is_discount = False
 
     transaction = Transaction(
         user_id=user.id,
@@ -270,6 +294,7 @@ def create_transaction():
         amount=amount,
         currency=currency,
         category=category,
+        is_discount=is_discount,
         source=source,
         note=note,
         tx_date=tx_date or datetime.utcnow().date(),
@@ -426,6 +451,13 @@ def update_transaction(transaction_id: int):
     if "note" in data:
         note = (data.get("note") or "").strip() or None
 
+    is_discount = bool(tx.is_discount)
+    if "is_discount" in data:
+        parsed_discount = _parse_bool(data.get("is_discount"))
+        if parsed_discount is None:
+            return jsonify({"error": "is_discount must be a boolean"}), 400
+        is_discount = parsed_discount
+
     category = tx.category
     if "category" in data:
         category = (data.get("category") or "").strip() or None
@@ -439,11 +471,13 @@ def update_transaction(transaction_id: int):
         category = None
         if not source:
             source = "Не указан"
+        is_discount = False
 
     tx.tx_type = tx_type
     tx.amount = amount
     tx.currency = currency
     tx.category = category
+    tx.is_discount = is_discount
     tx.source = source
     tx.note = note
     tx.tx_date = tx_date

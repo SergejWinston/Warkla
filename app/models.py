@@ -36,6 +36,7 @@ class Transaction(db.Model):
     amount = db.Column(db.Numeric(10, 2), nullable=False)
     currency = db.Column(db.String(3), nullable=False, default="RUB")
     category = db.Column(db.String(64), nullable=True, index=True)
+    is_discount = db.Column(db.Boolean, nullable=False, default=False)
     source = db.Column(db.String(128), nullable=True)
     note = db.Column(db.String(255), nullable=True)
     tx_date = db.Column(db.Date, nullable=False, index=True)
@@ -57,6 +58,7 @@ class Transaction(db.Model):
             "amount": amount_value,
             "currency": self.currency,
             "category": self.category,
+            "is_discount": bool(self.is_discount),
             "source": self.source,
             "note": self.note,
             "date": self.tx_date.isoformat(),
