@@ -1,279 +1,314 @@
-# Warkla
+# EGE-Bot: Интерактивный помощник для подготовки к ЕГЭ
 
-Тема проекта: трекер расхода денег для студента.
+Telegram-бот + веб-приложение для подготовки школьников к ЕГЭ. Бот генерирует вопросы по выбранному предмету, проверяет ответы, ведет статистику прогресса и объясняет ошибки.
 
-Warkla - это MVP веб-сервис для учета личных финансов, который помогает дожить от стипендии до стипендии без долгов: фиксирует доходы/расходы, прогнозирует остаток бюджета, показывает финансовые риски и добавляет мотивацию через достижения.
+## Основные возможности
 
-## 1. Цель и сценарий использования
+- **Выбор предмета и темы** - Пользователь выбирает предмет (русский язык, математика, информатика, обществознание)
+- **Генерация вопросов** - База готовых вопросов (загружается из NeoFamily API с кешированием)
+- **Разные типы вопросов** - выбор ответа, ввод числа, краткий текстовый ответ, множественный выбор
+- **Проверка ответов** - Автоматическая проверка правильности с объяснением ошибок
+- **Статистика и прогресс** - Процент правильных ответов по предметам и темам, визуализация графиков
+- **Ежедневная рассылка** - Уведомления с вопросом дня и напоминаниями о сложных темах
+- **Telegram-бот** - Полная интеграция с Telegram для удобного доступа
+- **Веб-приложение** - React/Vite приложение для подробной аналитики
 
-Пользователь ежедневно вносит транзакции:
-- доходы: стипендия, работа, подработка, помощь родителей;
-- расходы: еда, транспорт, развлечения, учеба, связь и т.д.
+## Технический стек
 
-Сервис рассчитывает:
-- текущий баланс;
-- безопасный лимит на сегодня;
-- дни до следующей стипендии;
-- прогноз на конец месяца;
-- предупреждения о риске финансовой ямы.
+### Backend
+- Flask, Flask-SQLAlchemy, Flask-JWT-Extended
+- aiogram для Telegram Bot
+- Redis для кеширования
+- SQLite (по умолчанию)
 
-## 2. Соответствие требованиям задания
+### Frontend
+- React/Vite
+- TailwindCSS
 
-1. Учет доходов/расходов
-- Реализовано добавление доходов с источником, датой, валютой.
-- Реализовано добавление расходов с категорией, датой, заметкой, флагом скидки.
+### CI/CD
+- GitHub Actions
 
-2. Прогнозирование и аналитика
-- Реализован прогноз остатка на конец месяца.
-- Реализованы данные для круговой диаграммы расходов по категориям.
-- Реализованы данные для линейного графика динамики баланса.
+## Локальный запуск
 
-3. Геймификация и уведомления
-- Реализована система достижений с прогрессом.
-- Реализованы статусные бюджетные предупреждения (danger/warning/info/success) и текстовые подсказки.
-
-4. Дашборд «Финансовое здоровье»
-- Текущий баланс.
-- Дней до стипендии.
-- Сколько можно потратить сегодня.
-- Прогноз на конец месяца (успех/риск).
-
-5. Инспектор транзакций
-- Лента операций с фильтрацией по дате, категории и типу.
-- Детали операции по ID.
-- Загрузка и просмотр фото чека.
-
-## 3. Технический стек
-
-- Backend: Flask, Flask-SQLAlchemy, Flask-Migrate, Flask-JWT-Extended, Flask-Cors.
-- Frontend: HTML/CSS/JavaScript (статическая SPA-подобная клиентская часть без отдельного node-сервера).
-- БД: SQLite по умолчанию (можно переопределить через `DATABASE_URL`).
-- Отчеты: CSV и PDF (reportlab).
-- Runtime: Python 3.11+, Gunicorn (в Docker).
-- CI/CD: Автоматический билд проекта и деплой на warkla.ru
-
-## 4. Архитектура
-
-- `app/__init__.py`: app factory, конфигурация, инициализация расширений, регистрация blueprints, глобальные обработчики ошибок.
-- `app/models.py`: модели `User`, `Transaction`, `Achievement`, `UserAchievement`, `UserProfile`.
-- `app/routes/*`: REST API (auth, transactions, dashboard/analytics, achievements, profile).
-- `app/services/*`: аналитика, бюджетные метрики, логика достижений.
-- `web/*`: клиентские страницы и JS-логика.
-
-При старте приложения:
-- создаются таблицы (`db.create_all()`),
-- выполняется сидирование достижений,
-- применяется защитная донастройка схемы для поля `currency` в `transactions`.
-
-## 5. Структура репозитория
-
-```text
-app/
-  routes/
-  services/
-  config.py
-  extensions.py
-  models.py
-  __init__.py
-web/
-  index.html
-  login.html
-  register.html
-  app.js
-  styles.css
-migrations/
-deploy/
-uploads/
-run.py
-requirements.txt
-Dockerfile
-```
-
-## 6. Локальный запуск
-
-### 6.1 Требования
-
-- Linux/macOS/WSL
+### Требования
 - Python 3.11+
 - pip
+- Node.js 16+ (для фронтенда)
 
-### 6.2 Установка и старт
+### Установка и запуск Backend + Bot
 
 ```bash
-python -m venv .venv
-source .venv/bin/activate
+# 1. Клонируйте репозиторий
+git clone https://github.com/your-repo/ege-bot.git
+cd ege-bot
+
+# 2. Создайте виртуальную среду
+python -m venv venv
+source venv/bin/activate  # Linux/Mac
+# или на Windows:
+# venv\Scripts\activate
+
+# 3. Установите зависимости
 pip install -r requirements.txt
+
+# 4. Создайте .env
+cp .env.example .env
+# Отредактируйте .env и установите TELEGRAM_BOT_TOKEN
+
+# 5. Запустите приложение
 python run.py
 ```
 
-Приложение будет доступно на `http://localhost:5000`.
+Приложение будет доступно на `http://localhost:5000`
 
-Основные страницы:
-- `/` - приложение;
-- `/login` - вход;
-- `/register` - регистрация;
-- `/how_build` - описание сборки/архитектуры.
-
-## 7. Запуск в Docker
+### Установка и запуск Frontend
 
 ```bash
-docker pull ghcr.io/sergejwinston/warkla:latest
-docker run -d \
-  --name warkla \
-  -p 5000:5000 \
-  -e SECRET_KEY='change-me' \
-  -e JWT_SECRET_KEY='change-me-too' \
-  -e DATABASE_URL='sqlite:////app/data/warkla.db' \
-  -e UPLOAD_FOLDER='/app/data/uploads' \
-  -v $(pwd)/data:/app/data \
-  ghcr.io/sergejwinston/warkla
+cd frontend
+
+# 1. Установите зависимости
+npm install
+
+# 2. Запустите dev сервер
+npm run dev
 ```
 
-Контейнер стартует через Gunicorn (`run:app`) и слушает порт `5000`.
+Фронтенд будет доступен на `http://localhost:5173`
 
-## 8. Конфигурация окружения
-
-Поддерживается настройка через системные переменные или `.env`.
-
-| Переменная | Значение по умолчанию | Назначение |
-| --- | --- | --- |
-| `FLASK_ENV` | `development` | Профиль конфигурации (`development` / `testing`) |
-| `SECRET_KEY` | `dev-secret-key` | Секрет Flask-сессий |
-| `JWT_SECRET_KEY` | `dev-jwt-secret` | Секрет подписи JWT |
-| `JWT_ACCESS_TOKEN_EXPIRES_DAYS` | `30` | TTL access token (дни) |
-| `DATABASE_URL` | `sqlite:///.../warkla.db` | SQLAlchemy DSN |
-| `CORS_ORIGINS` | `*` | Разрешенные origin для `/api/*` |
-| `UPLOAD_FOLDER` | `uploads` | Хранилище чеков и аватаров |
-| `MAX_CONTENT_LENGTH` | `5242880` | Максимальный размер upload (байт) |
-
-Пример:
-
-```env
-FLASK_ENV=development
-SECRET_KEY=change-me
-JWT_SECRET_KEY=change-me-too
-JWT_ACCESS_TOKEN_EXPIRES_DAYS=30
-DATABASE_URL=sqlite:///warkla.db
-CORS_ORIGINS=*
-UPLOAD_FOLDER=uploads
-MAX_CONTENT_LENGTH=5242880
-```
-
-## 9. REST API
-
-Базовые группы:
-- `/api/auth`
-- `/api/transactions`
-- `/api/dashboard`
-- `/api/analytics/*`
-- `/api/achievements`
-- `/api/profile`
-
-### 9.1 Auth
-
-- `POST /api/auth/register`
-- `POST /api/auth/login`
-
-Ответ содержит `access_token`.
-
-### 9.2 Transactions
-
-- `POST /api/transactions` - создать транзакцию.
-- `GET /api/transactions` - список с пагинацией (`page`, `per_page<=100`) и фильтрами (`date_from`, `date_to`, `category`, `type`).
-- `GET /api/transactions/<id>` - детальная карточка.
-- `PATCH /api/transactions/<id>` - обновление.
-- `DELETE /api/transactions/<id>` - удаление.
-- `POST /api/transactions/<id>/receipt` - загрузка чека.
-- `GET /api/transactions/<id>/receipt` - просмотр чека.
-- `GET /api/transactions/export?format=csv|pdf` - экспорт.
-
-Ограничения:
-- `type`: `income` или `expense`.
-- `currency`: `RUB` или `USD`.
-- Для `expense` обязательна корректная категория: `food`, `transport`, `entertainment`, `study`, `communication`, `health`, `housing`, `other`.
-- Чеки: `jpg/jpeg/png/webp`.
-
-### 9.3 Dashboard и Analytics
-
-- `GET /api/dashboard`
-- `GET /api/analytics/categories`
-- `GET /api/analytics/timeline`
-- `GET /api/analytics/forecast`
-- `GET /api/analytics/sources`
-- `GET /api/analytics/stats`
-- `GET /api/analytics/comparison?period=week|month|quarter`
-- `GET /api/analytics/category/<category>/timeline`
-- `GET /api/analytics/anomalies?lookback=90`
-
-### 9.4 Achievements
-
-- `GET /api/achievements`
-
-### 9.5 Profile
-
-- `GET /api/profile`
-- `PATCH /api/profile`
-- `POST /api/profile/avatar`
-
-## 10. Авторизация
-
-Все API, кроме `POST /api/auth/register` и `POST /api/auth/login`, требуют JWT:
-
-```http
-Authorization: Bearer <access_token>
-```
-
-## 11. Примеры запросов (curl)
-
-Регистрация:
+### Запуск только компонентов Backend
 
 ```bash
-curl -X POST http://localhost:5000/api/auth/register \
-  -H "Content-Type: application/json" \
-  -d '{"username":"student1","email":"student1@example.com","password":"123456"}'
+# Только Flask API:
+python run.py flask
+
+# Только Telegram Bot:
+python run.py bot
+
+# Оба компонента (Flask + Telegram):
+python run.py all  # или просто python run.py
 ```
 
-Логин:
+## API Endpoints
+
+### Authentication
+- `POST /api/auth/register` - Регистрация
+- `POST /api/auth/login` - Логин
+- `GET /api/auth/me` - Текущий пользователь (protected)
+
+### Subjects & Themes
+- `GET /api/subjects` - Список предметов
+- `GET /api/subjects/<id>/themes` - Темы предмета
+- `GET /api/subjects/<id>/progress` - Прогресс (protected)
+
+### Questions
+- `GET /api/questions?subject=<id>&theme=<id>` - Получить вопрос (protected)
+- `GET /api/questions/<id>/solution` - Вопрос с ответом (protected)
+
+### Answers
+- `POST /api/answers` - Отправить ответ (protected)
+- `GET /api/answers/history` - История ответов (protected)
+
+### Statistics
+- `GET /api/stats` - Общая статистика (protected)
+- `GET /api/stats/subjects` - По предметам (protected)
+- `GET /api/stats/streak` - Дневной стрик (protected)
+
+## Telegram Bot
+
+Бот работает на aiogram 3.0+ и поддерживает следующие команды:
+
+- `/start` - Начать работу с ботом
+- `/help` - Справка
+- `/stats` - Просмотр результатов
+
+### Функции бота:
+
+1. **Выбор предмета** - нажми "📚 Выбрать предмет" и выбери интересующий предмет
+2. **Выбор темы** - выбери тему в рамках предмета
+3. **Ответ на вопрос** - бот присылает вопрос, ты отвечаешь (выбором или текстом)
+4. **Проверка ответа** - бот проверяет ответ, показывает статистику
+5. **Просмотр результатов** - нажми "📊 Мои результаты" для просмотра прогресса
+6. **Профиль** - нажми "⚙️ Профиль" для просмотра информации о твоем аккаунте
+
+### Поддерживаемые типы вопросов:
+
+- **Multiple choice** - выбор одного из вариантов (с клавиатурой)
+- **Number input** - ввод числового ответа
+- **Text input** - ввод текстового ответа
+- **Multiple selection** - выбор нескольких правильных ответов
+
+## Веб-приложение (Frontend)
+
+React/Vite приложение с полным функционалом:
+
+### Страницы:
+- **Login** - Регистрация и авторизация
+- **Dashboard** - Главная панель с статистикой
+- **Quiz** - Решение вопросов
+- **Stats** - Подробная статистика по предметам
+- **History** - История всех ответов с пагинацией
+- **Leaderboard** - Таблица лучших игроков
+
+### Компоненты:
+- QuestionCard - Отображение вопроса и ввод ответа
+- ResultCard - Результат проверки ответа
+- SubjectSelector - Выбор предмета и темы
+- ProtectedRoute - Защита маршрутов на основе аутентификации
+
+Подробнее см. [Frontend README](./frontend/README.md)
+
+## Docker
+
+### Docker Compose (рекомендуется для быстрого старта)
 
 ```bash
-curl -X POST http://localhost:5000/api/auth/login \
-  -H "Content-Type: application/json" \
-  -d '{"email":"student1@example.com","password":"123456"}'
+# 1. Клонируйте репозиторий
+git clone https://github.com/your-repo/ege-bot.git
+cd ege-bot
+
+# 2. Создайте .env файл
+cp .env.example .env
+# Отредактируйте .env и установите TELEGRAM_BOT_TOKEN
+
+# 3. Запустите с Docker Compose (включает Redis)
+docker-compose up -d
+
+# 4. Проверьте логи
+docker-compose logs -f app
 ```
 
-Создание расхода:
+Docker Compose запустит:
+- **EGE-Bot приложение** (Flask API + Telegram Bot) на `http://localhost:5000`
+- **Redis** для кеширования на `localhost:6379`
+
+### Standalone Docker
 
 ```bash
-curl -X POST http://localhost:5000/api/transactions \
-  -H "Content-Type: application/json" \
-  -H "Authorization: Bearer <TOKEN>" \
-  -d '{"type":"expense","amount":450,"currency":"RUB","category":"food","date":"2026-03-24","note":"Обед"}'
+# Сборка образа
+docker build -t ege-bot .
+
+# Запуск без Redis (для дебага)
+docker run -p 5000:5000 ege-bot
+
+# Запуск с Redis
+docker run -p 5000:5000 \
+  -e REDIS_URL=redis://redis:6379/0 \
+  ege-bot
 ```
 
-Дашборд:
+### Production Environment
 
-```bash
-curl -X GET http://localhost:5000/api/dashboard \
-  -H "Authorization: Bearer <TOKEN>"
+Для production переменные окружения:
+- `FLASK_ENV=production` - Включает Redis кеширование и оптимизации
+- `REDIS_URL=redis://hostname:6379/0` - Подключение к Redis
+- `JWT_SECRET_KEY=your-secret-key` - JWT токен
+- `TELEGRAM_BOT_TOKEN=your-bot-token` - Telegram бот токен
+
+## CI/CD и Авторазвертка
+
+### GitHub Actions Workflows
+
+Проект поддерживает полностью автоматическую развертку с GitHub Actions:
+
+**1. ci-cd.yml** - Backend CI/CD:
+   - ✅ Линтер (flake8) для Python кода
+   - ✅ Сборка фронтенда (Vite)
+   - ✅ Тесты (если существуют)
+   - ✅ Автоматическая развертка Backend на сервер
+   - ✅ Реальная работа: собирает оба компонента и развертывает их
+
+**2. frontend.yml** - Frontend только:
+   - ✅ Линтер (ESLint, опционально)
+   - ✅ Сборка Vite проекта
+   - ✅ Проверка артефактов (dist/)
+   - ✅ Деплой фронтенда на веб-сервер (Nginx)
+   - ✅ Срабатывает: только при изменении файлов в `frontend/`
+
+**3. docker.yml** - Docker образ:
+   - ✅ Сборка Docker образа
+   - ✅ Пуш в GitHub Container Registry (ghcr.io)
+   - ✅ Кеширование слоев для быстрой сборки
+
+### Как работает развертка
+
+**На Push в main ветку:**
+```
+Автоматический цикл:
+  1. Линтинг Backend (flake8)
+  2. Сборка Frontend (npm run build)
+  3. Запуск тестов
+  4. SSH деплой на сервер
+  5. Перезагрузка сервисов (Flask + Bot + Nginx)
+  ✅ Готово!
 ```
 
-## 12. База данных и миграции
-
-- По умолчанию используется SQLite файл `warkla.db` в корне проекта.
-- Для управляемых изменений схемы используется Flask-Migrate (Alembic).
-
-Пример:
-
-```bash
-flask db migrate -m "add new field"
-flask db upgrade
+**Если меняются только файлы frontend/:**
+```
+Быстрый фронтенд-деплой:
+  1. npm install
+  2. npm run build → dist/
+  3. rsync dist/ на сервер → Nginx
+  ✅ Быстрый деплой без перестройки Backend!
 ```
 
-Важно: в проекте уже есть рабочий каталог `migrations/`.
+### Настройка авторазвертки
 
-## 13. Дорожная карта (следующий шаг)
+1. **Добавьте Secrets в GitHub репозитории:**
+   ```
+   Settings → Secrets and variables → Actions → New repository secret
+   ```
 
-- Telegram-бот как дополнительный интерфейс ввода транзакций.
-- Push/чат-уведомления с персонализацией.
-- Расширение валют и динамические курсы.
-- Тесты (unit/integration/e2e) и CI-пайплайн.
+   Требуемые secrets:
+   - `DEPLOY_HOST` - IP адрес сервера
+   - `DEPLOY_USER` - SSH пользователь
+   - `DEPLOY_KEY` - Приватный SSH ключ
+   - `DEPLOY_PATH` - Путь на сервере (напр. `/opt/ege-bot`)
+
+2. **Подготовка сервера:**
+   ```bash
+   # На сервере:
+   mkdir -p /opt/ege-bot
+   chmod 755 /opt/ege-bot
+
+   # Создайте systemd сервис для ege-bot
+   sudo nano /etc/systemd/system/ege-bot.service
+   ```
+
+3. **Systemd сервис (ege-bot.service):**
+   ```ini
+   [Unit]
+   Description=EGE-Bot Service
+   After=network.target
+
+   [Service]
+   Type=simple
+   User=appuser
+   WorkingDirectory=/opt/ege-bot
+   Environment="PATH=/opt/ege-bot/venv/bin"
+   ExecStart=/opt/ege-bot/venv/bin/python run.py all
+   Restart=always
+   RestartSec=10
+   StandardOutput=journal
+   StandardError=journal
+
+   [Install]
+   WantedBy=multi-user.target
+   ```
+
+### Redis кеширование
+
+Redis кеширование **автоматически включается в production** (`FLASK_ENV=production`):
+
+- Кешируются вопросы из NeoFamily API на 24 часа
+- Случайные вопросы кешируются на 1 час
+- Кеширование опционально - работает если Redis доступен
+- Для дебага Redis не требуется
+
+Преимущества:
+- ⚡ 10x более быстрое получение вопросов
+- 📉 Снижение нагрузки на внешнее API
+- 💾 Экономия трафика
+
+## Лицензия
+
+MIT License

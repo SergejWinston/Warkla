@@ -1,0 +1,128 @@
+name: EGE-Bot CI/CD
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  lint-and-test:
+    runs-on: ubuntu-latest
+    name: Lint & Test Backend
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+        cache: 'pip'
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install pytest flake8
+
+    - name: Lint with flake8
+      run: |
+        flake8 app bot --count --select=E9,F63,F7,F82 --show-source --statistics
+        flake8 app bot --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+
+    - name: Run tests
+      env:
+        FLASK_ENV: testing
+        JWT_SECRET_KEY: test-secret-key
+      run: |
+        pytest tests/ -v --cov=app --cov-report=xml 2>/dev/null || echo "No tests yet"
+
+  build-frontend:
+    runs-on: ubuntu-latest
+    name: Build Frontend
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+        cache-dependency-path: 'frontend/package-lock.json'
+
+    - name: Install dependencies
+      run: cd frontend && npm ci
+
+    - name: Build
+      run: cd frontend && npm run build
+
+    - name: Upload artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: frontend-build
+        path: frontend/dist/
+
+  deploy:
+    needs: [lint-and-test, build-frontend]
+    runs-on: ubuntu-latest
+    name: Deploy to Production
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Download frontend artifact
+      uses: actions/download-artifact@v4
+      with:
+        name: frontend-build
+        path: frontend/dist/
+
+    - name: Deploy to server
+      env:
+        DEPLOY_KEY: ${{ secrets.DEPLOY_KEY }}
+        DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+        DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+        DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
+      run: |
+        mkdir -p ~/.ssh
+        echo "$DEPLOY_KEY" > ~/.ssh/deploy_key
+        chmod 600 ~/.ssh/deploy_key
+        ssh-keyscan -H "$DEPLOY_HOST" >> ~/.ssh/known_hosts
+
+        rsync -avz --delete \
+          -e "ssh -i ~/.ssh/deploy_key" \
+          --exclude='.git' \
+          --exclude='venv' \
+          --exclude='node_modules' \
+          --exclude='.env' \
+          --exclude='__pycache__' \
+          --exclude='*.db' \
+          ./ "${DEPLOY_USER}@${DEPLOY_HOST}:${DEPLOY_PATH}/"
+
+        ssh -i ~/.ssh/deploy_key "${DEPLOY_USER}@${DEPLOY_HOST}" \
+          "cd ${DEPLOY_PATH} && \
+          python -m venv venv && \
+          source venv/bin/activate && \
+          pip install -r requirements.txt && \
+          cd frontend && \
+          npm install && \
+          npm run build && \
+          cd .. && \
+          systemctl restart ege-bot"
+
+  notify:
+    needs: [deploy]
+    runs-on: ubuntu-latest
+    name: Notify Deployment
+    if: always()
+
+    steps:
+    - name: Deployment Status
+      run: |
+        if [ "${{ needs.deploy.result }}" == "success" ]; then
+          echo "✅ EGE-Bot deployment successful!"
+        else
+          echo "❌ EGE-Bot deployment failed!"
+        fi

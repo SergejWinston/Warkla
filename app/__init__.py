@@ -1,7 +1,7 @@
 import os
 from pathlib import Path
 
-from flask import Flask, jsonify, send_from_directory
+from flask import Flask, jsonify
 from flask_cors import CORS
 from sqlalchemy.exc import OperationalError
 from sqlalchemy import inspect, text
@@ -10,22 +10,38 @@ from app.config import config_map
 from app.extensions import db, jwt, migrate
 
 
-def _ensure_currency_column(app: Flask) -> None:
-    with app.app_context():
-        columns = {col["name"] for col in inspect(db.engine).get_columns("transactions")}
-        if "currency" not in columns:
-            try:
-                db.session.execute(text("ALTER TABLE transactions ADD COLUMN currency VARCHAR(3) NOT NULL DEFAULT 'RUB'"))
-                db.session.commit()
-            except OperationalError as exc:
-                db.session.rollback()
-                # Dev reloader / multi-process boot can race here; ignore duplicate column only.
-                if "duplicate column name" not in str(exc).lower():
-                    raise
+def _ensure_sqlite_schema_compatibility() -> None:
+    """Apply minimal schema patches for existing SQLite databases."""
+    engine = db.engine
+    if engine.dialect.name != "sqlite":
+        return
+
+    inspector = inspect(engine)
+
+    required_columns: dict[str, dict[str, str]] = {
+        "users": {"updated_at": "DATETIME"},
+        "questions": {"updated_at": "DATETIME"},
+    }
+
+    for table_name, columns in required_columns.items():
+        if table_name not in inspector.get_table_names():
+            continue
+
+        existing_columns = {column["name"] for column in inspector.get_columns(table_name)}
+        for column_name, column_type in columns.items():
+            if column_name in existing_columns:
+                continue
+
+            db.session.execute(
+                text(
+                    f"ALTER TABLE {table_name} ADD COLUMN {column_name} {column_type}"
+                )
+            )
+
+    db.session.commit()
 
 
 def create_app(config_name: str | None = None) -> Flask:
-    web_dir = Path(__file__).resolve().parent.parent / "web"
     app = Flask(__name__)
 
     cfg_name = config_name or os.getenv("FLASK_ENV", "development")
@@ -40,24 +56,28 @@ def create_app(config_name: str | None = None) -> Flask:
     migrate.init_app(app, db)
     jwt.init_app(app)
 
-    from app.routes.achievements import achievements_bp
+    # Register blueprints
     from app.routes.auth import auth_bp
-    from app.routes.budget import budget_bp
-    from app.routes.profile import profile_bp
-    from app.routes.transactions import transactions_bp
-    from app.services.achievements import seed_achievements
+    from app.routes.subjects import subjects_bp
+    from app.routes.questions import questions_bp
+    from app.routes.answers import answers_bp
+    from app.routes.stats import stats_bp
+    from app.routes.webhook import webhook_bp
 
     app.register_blueprint(auth_bp)
-    app.register_blueprint(transactions_bp)
-    app.register_blueprint(budget_bp)
-    app.register_blueprint(achievements_bp)
-    app.register_blueprint(profile_bp)
+    app.register_blueprint(subjects_bp)
+    app.register_blueprint(questions_bp)
+    app.register_blueprint(answers_bp)
+    app.register_blueprint(stats_bp)
+    app.register_blueprint(webhook_bp)
 
     with app.app_context():
         db.create_all()
-        _ensure_currency_column(app)
-        seed_achievements()
+        _ensure_sqlite_schema_compatibility()
+        from app.services import seed_subjects
+        seed_subjects()
 
+    # Global error handlers
     @app.errorhandler(400)
     def bad_request(_error):
         return jsonify({"error": "Bad request"}), 400
@@ -82,27 +102,8 @@ def create_app(config_name: str | None = None) -> Flask:
     def internal_error(_error):
         return jsonify({"error": "Internal server error"}), 500
 
-    @app.get("/")
-    def index():
-        return send_from_directory(web_dir, "index.html")
-
-    @app.get("/login")
-    def login_page():
-        return send_from_directory(web_dir, "login.html")
-
-    @app.get("/register")
-    def register_page():
-        return send_from_directory(web_dir, "register.html")
-
-    @app.get("/how_build")
-    def how_build_page():
-        return send_from_directory(web_dir, "how_build.html")
-
-    @app.get("/<path:path>")
-    def static_proxy(path: str):
-        target = web_dir / path
-        if target.exists() and target.is_file():
-            return send_from_directory(web_dir, path)
-        return send_from_directory(web_dir, "index.html")
+    @app.get("/api/health")
+    def health_check():
+        return jsonify({"status": "ok"}), 200
 
     return app

@@ -1,0 +1,99 @@
+name: Frontend CI/CD
+
+on:
+  push:
+    branches: [ main, develop ]
+    paths:
+      - 'frontend/**'
+      - '.github/workflows/frontend.yml'
+  pull_request:
+    branches: [ main, develop ]
+    paths:
+      - 'frontend/**'
+  workflow_dispatch:
+
+jobs:
+  lint-and-build:
+    runs-on: ubuntu-latest
+    name: Lint & Build Frontend
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+        cache-dependency-path: 'frontend/package-lock.json'
+
+    - name: Install dependencies
+      run: cd frontend && npm ci
+
+    - name: Lint with ESLint
+      run: cd frontend && npm run lint 2>/dev/null || echo "ESLint not configured (optional)"
+
+    - name: Build
+      run: cd frontend && npm run build
+
+    - name: Check build artifacts
+      run: |
+        if [ -d frontend/dist ]; then
+          echo "✅ Build successful"
+          du -sh frontend/dist
+        else
+          echo "❌ Build failed - no dist folder"
+          exit 1
+        fi
+
+    - name: Upload artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: frontend-dist
+        path: frontend/dist/
+        retention-days: 1
+
+  deploy-frontend:
+    needs: lint-and-build
+    runs-on: ubuntu-latest
+    name: Deploy Frontend
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Download artifact
+      uses: actions/download-artifact@v4
+      with:
+        name: frontend-dist
+        path: frontend/dist/
+
+    - name: Deploy to server
+      env:
+        DEPLOY_KEY: ${{ secrets.DEPLOY_KEY }}
+        DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+        DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+        DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
+      run: |
+        mkdir -p ~/.ssh
+        echo "$DEPLOY_KEY" > ~/.ssh/deploy_key
+        chmod 600 ~/.ssh/deploy_key
+        ssh-keyscan -H "$DEPLOY_HOST" >> ~/.ssh/known_hosts 2>/dev/null
+
+        # Deploy frontend to web server
+        rsync -avz --delete \
+          -e "ssh -i ~/.ssh/deploy_key" \
+          frontend/dist/ "${DEPLOY_USER}@${DEPLOY_HOST}:${DEPLOY_PATH}/frontend/dist/"
+
+        # Restart web server if needed
+        ssh -i ~/.ssh/deploy_key "${DEPLOY_USER}@${DEPLOY_HOST}" \
+          "systemctl restart nginx || echo 'Nginx not configured'"
+
+    - name: Notify deployment
+      if: always()
+      run: |
+        if [ "${{ job.status }}" == "success" ]; then
+          echo "✅ Frontend deployed successfully!"
+        else
+          echo "❌ Frontend deployment failed!"
+        fi

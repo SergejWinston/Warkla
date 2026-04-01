@@ -1,24 +1,23 @@
 from datetime import datetime, timezone
-from decimal import Decimal
-
 from werkzeug.security import check_password_hash, generate_password_hash
-
 from app.extensions import db
 
 
 class User(db.Model):
+    """User model for EGE preparation app."""
     __tablename__ = "users"
 
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(80), unique=True, nullable=False, index=True)
     email = db.Column(db.String(255), unique=True, nullable=False, index=True)
     password_hash = db.Column(db.String(255), nullable=False)
-    stipend_day = db.Column(db.Integer, nullable=False, default=25)
+    stipend_day = db.Column(db.Integer, nullable=False, default=1)
     created_at = db.Column(db.DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
+    updated_at = db.Column(db.DateTime, nullable=False, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
 
-    transactions = db.relationship("Transaction", back_populates="user", cascade="all, delete-orphan")
-    unlocked_achievements = db.relationship("UserAchievement", back_populates="user", cascade="all, delete-orphan")
-    profile = db.relationship("UserProfile", back_populates="user", uselist=False, cascade="all, delete-orphan")
+    # Relationships
+    stats = db.relationship("UserStat", back_populates="user", cascade="all, delete-orphan")
+    answers = db.relationship("UserAnswer", back_populates="user", cascade="all, delete-orphan")
 
     def set_password(self, password: str) -> None:
         self.password_hash = generate_password_hash(password)
@@ -26,83 +25,172 @@ class User(db.Model):
     def check_password(self, password: str) -> bool:
         return check_password_hash(self.password_hash, password)
 
-
-class Transaction(db.Model):
-    __tablename__ = "transactions"
-
-    id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False, index=True)
-    tx_type = db.Column(db.String(20), nullable=False, index=True)
-    amount = db.Column(db.Numeric(10, 2), nullable=False)
-    currency = db.Column(db.String(3), nullable=False, default="RUB")
-    category = db.Column(db.String(64), nullable=True, index=True)
-    is_discount = db.Column(db.Boolean, nullable=False, default=False)
-    source = db.Column(db.String(128), nullable=True)
-    note = db.Column(db.String(255), nullable=True)
-    tx_date = db.Column(db.Date, nullable=False, index=True)
-    receipt_path = db.Column(db.String(255), nullable=True)
-    created_at = db.Column(db.DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
-
-    user = db.relationship("User", back_populates="transactions")
-
-    __table_args__ = (
-        db.CheckConstraint("tx_type IN ('income', 'expense')", name="check_tx_type"),
-        db.CheckConstraint("amount > 0", name="check_amount_positive"),
-    )
-
-    def as_dict(self) -> dict:
-        amount_value = float(self.amount) if isinstance(self.amount, Decimal) else self.amount
+    def to_dict(self) -> dict:
         return {
             "id": self.id,
-            "type": self.tx_type,
-            "amount": amount_value,
-            "currency": self.currency,
-            "category": self.category,
-            "is_discount": bool(self.is_discount),
-            "source": self.source,
-            "note": self.note,
-            "date": self.tx_date.isoformat(),
-            "receipt_path": self.receipt_path,
+            "username": self.username,
+            "email": self.email,
             "created_at": self.created_at.isoformat(),
         }
 
 
-class Achievement(db.Model):
-    __tablename__ = "achievements"
+class Subject(db.Model):
+    """Subject model (e.g., 'Русский язык', 'Математика', 'Информатика')."""
+    __tablename__ = "subjects"
 
     id = db.Column(db.Integer, primary_key=True)
-    key = db.Column(db.String(64), unique=True, nullable=False)
-    title = db.Column(db.String(128), nullable=False)
-    description = db.Column(db.String(255), nullable=False)
-    metric = db.Column(db.String(64), nullable=False)
-    threshold = db.Column(db.Integer, nullable=False)
+    name = db.Column(db.String(255), nullable=False, unique=True)
+    slug = db.Column(db.String(100), nullable=False, unique=True, index=True)
+    description = db.Column(db.String(500), nullable=True)
 
-    users = db.relationship("UserAchievement", back_populates="achievement", cascade="all, delete-orphan")
+    # Relationships
+    themes = db.relationship("Theme", back_populates="subject", cascade="all, delete-orphan")
+    questions = db.relationship("Question", back_populates="subject", cascade="all, delete-orphan")
+    stats = db.relationship("UserStat", back_populates="subject", cascade="all, delete-orphan")
+
+    def to_dict(self) -> dict:
+        return {
+            "id": self.id,
+            "name": self.name,
+            "slug": self.slug,
+            "description": self.description,
+        }
 
 
-class UserAchievement(db.Model):
-    __tablename__ = "user_achievements"
+class Theme(db.Model):
+    """Theme model for a subject (e.g., 'Орфография' for русский язык)."""
+    __tablename__ = "themes"
+
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(255), nullable=False)
+    subject_id = db.Column(db.Integer, db.ForeignKey("subjects.id"), nullable=False, index=True)
+    section_name = db.Column(db.String(255), nullable=True)  # e.g., "Орфография"
+
+    # Relationships
+    subject = db.relationship("Subject", back_populates="themes")
+    questions = db.relationship("Question", back_populates="theme", cascade="all, delete-orphan")
+    stats = db.relationship("UserStat", back_populates="theme", cascade="all, delete-orphan")
+
+    def to_dict(self) -> dict:
+        return {
+            "id": self.id,
+            "name": self.name,
+            "subject_id": self.subject_id,
+            "section_name": self.section_name,
+        }
+
+
+class Question(db.Model):
+    """Question model for EGE practice."""
+    __tablename__ = "questions"
+
+    id = db.Column(db.Integer, primary_key=True)
+    text = db.Column(db.Text, nullable=False)
+    subject_id = db.Column(db.Integer, db.ForeignKey("subjects.id"), nullable=False, index=True)
+    theme_id = db.Column(db.Integer, db.ForeignKey("themes.id"), nullable=True, index=True)
+    question_type = db.Column(db.String(50), nullable=False)  # 'choice', 'number', 'text', 'multiple'
+    options = db.Column(db.JSON, nullable=True)  # For 'choice' type: ["A) вариант1", "B) вариант2", ...]
+    answer = db.Column(db.String(500), nullable=False)  # Correct answer
+    explanation = db.Column(db.Text, nullable=True)  # Explanation for correct answer
+    difficulty = db.Column(db.Integer, nullable=True)  # 1-5 scale
+    source = db.Column(db.String(50), nullable=False, default="neofamily")  # 'neofamily', 'internal'
+    external_id = db.Column(db.String(100), nullable=True)  # ID from external API
+    created_at = db.Column(db.DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
+    updated_at = db.Column(db.DateTime, nullable=False, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+
+    # Relationships
+    subject = db.relationship("Subject", back_populates="questions")
+    theme = db.relationship("Theme", back_populates="questions")
+    user_answers = db.relationship("UserAnswer", back_populates="question", cascade="all, delete-orphan")
+
+    __table_args__ = (
+        db.Index("idx_subject_theme", "subject_id", "theme_id"),
+    )
+
+    def to_dict(self, include_answer: bool = False) -> dict:
+        result = {
+            "id": self.id,
+            "text": self.text,
+            "subject_id": self.subject_id,
+            "theme_id": self.theme_id,
+            "type": self.question_type,
+            "options": self.options,
+            "difficulty": self.difficulty,
+        }
+        if include_answer:
+            result["answer"] = self.answer
+            result["explanation"] = self.explanation
+        return result
+
+
+class UserStat(db.Model):
+    """User statistics per subject and theme."""
+    __tablename__ = "user_stats"
 
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False, index=True)
-    achievement_id = db.Column(db.Integer, db.ForeignKey("achievements.id"), nullable=False, index=True)
-    unlocked_at = db.Column(db.DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
+    subject_id = db.Column(db.Integer, db.ForeignKey("subjects.id"), nullable=False, index=True)
+    theme_id = db.Column(db.Integer, db.ForeignKey("themes.id"), nullable=True, index=True)
+    total_answers = db.Column(db.Integer, nullable=False, default=0)
+    correct_answers = db.Column(db.Integer, nullable=False, default=0)
+    last_updated = db.Column(db.DateTime, nullable=False, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
 
-    user = db.relationship("User", back_populates="unlocked_achievements")
-    achievement = db.relationship("Achievement", back_populates="users")
+    # Relationships
+    user = db.relationship("User", back_populates="stats")
+    subject = db.relationship("Subject", back_populates="stats")
+    theme = db.relationship("Theme", back_populates="stats")
 
     __table_args__ = (
-        db.UniqueConstraint("user_id", "achievement_id", name="uq_user_achievement"),
+        db.UniqueConstraint("user_id", "subject_id", "theme_id", name="uq_user_subject_theme"),
     )
 
+    def get_progress(self) -> float:
+        """Get progress as percentage."""
+        if self.total_answers == 0:
+            return 0.0
+        return (self.correct_answers / self.total_answers) * 100
 
-class UserProfile(db.Model):
-    __tablename__ = "user_profiles"
+    def to_dict(self) -> dict:
+        return {
+            "id": self.id,
+            "user_id": self.user_id,
+            "subject_id": self.subject_id,
+            "theme_id": self.theme_id,
+            "total_answers": self.total_answers,
+            "correct_answers": self.correct_answers,
+            "progress": self.get_progress(),
+            "last_updated": self.last_updated.isoformat(),
+        }
+
+
+class UserAnswer(db.Model):
+    """User's answer to a question."""
+    __tablename__ = "user_answers"
 
     id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False, unique=True, index=True)
-    avatar_path = db.Column(db.String(255), nullable=True)
-    preferred_currency = db.Column(db.String(3), nullable=False, default="RUB")
-    updated_at = db.Column(db.DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False, index=True)
+    question_id = db.Column(db.Integer, db.ForeignKey("questions.id"), nullable=False, index=True)
+    user_answer = db.Column(db.String(500), nullable=False)
+    is_correct = db.Column(db.Boolean, nullable=False)
+    time_spent = db.Column(db.Integer, nullable=True)  # in seconds
+    answered_at = db.Column(db.DateTime, nullable=False, default=lambda: datetime.now(timezone.utc), index=True)
 
-    user = db.relationship("User", back_populates="profile")
+    # Relationships
+    user = db.relationship("User", back_populates="answers")
+    question = db.relationship("Question", back_populates="user_answers")
+
+    __table_args__ = (
+        db.Index("idx_user_answered", "user_id", "answered_at"),
+        db.Index("idx_question_answered", "question_id", "answered_at"),
+    )
+
+    def to_dict(self) -> dict:
+        return {
+            "id": self.id,
+            "user_id": self.user_id,
+            "question_id": self.question_id,
+            "user_answer": self.user_answer,
+            "is_correct": self.is_correct,
+            "time_spent": self.time_spent,
+            "answered_at": self.answered_at.isoformat(),
+        }
