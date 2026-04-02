@@ -50,6 +50,7 @@ export default function QuestionCard({ question, onSubmit, isLoading, result }) 
 
   const handleSubmit = () => {
     if (!question) return
+    setIsHintVisible(false)
 
     if ((question.type === 'choice' || question.type === 'multiple') && options.length > 0) {
       onSubmit(question.id, selectedOption)

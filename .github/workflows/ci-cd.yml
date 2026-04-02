@@ -122,13 +122,15 @@ jobs:
     - name: Check deploy configuration
       id: deploy-config
       env:
-        DEPLOY_KEY: ${{ secrets.DEPLOY_KEY }}
-        DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
-        DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
-        DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
+        SSH_KEY: ${{ secrets.SSH_KEY || secrets.DEPLOY_KEY }}
+        SSH_HOST: ${{ secrets.SSH_HOST || secrets.DEPLOY_HOST }}
+        SSH_USER: ${{ secrets.SSH_USER || secrets.DEPLOY_USER }}
+        SSH_PORT: ${{ secrets.SSH_PORT || '22' }}
+        DEPLOY_PATH: ${{ secrets.DEPLOY_PATH || vars.DEPLOY_PATH || '/opt/warkla' }}
+        GH_PAT: ${{ secrets.GH_PAT }}
       run: |
         missing=0
-        for var in DEPLOY_KEY DEPLOY_HOST DEPLOY_USER DEPLOY_PATH; do
+        for var in SSH_KEY SSH_HOST SSH_USER DEPLOY_PATH; do
           if [ -z "${!var}" ]; then
             echo "Missing secret: $var"
             missing=1
@@ -146,27 +148,29 @@ jobs:
     - name: Deploy to server
       if: steps.deploy-config.outputs.ready == 'true'
       env:
-        DEPLOY_KEY: ${{ secrets.DEPLOY_KEY }}
-        DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
-        DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
-        DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
+        SSH_KEY: ${{ secrets.SSH_KEY || secrets.DEPLOY_KEY }}
+        SSH_HOST: ${{ secrets.SSH_HOST || secrets.DEPLOY_HOST }}
+        SSH_USER: ${{ secrets.SSH_USER || secrets.DEPLOY_USER }}
+        SSH_PORT: ${{ secrets.SSH_PORT || '22' }}
+        DEPLOY_PATH: ${{ secrets.DEPLOY_PATH || vars.DEPLOY_PATH || '/opt/warkla' }}
+        GH_PAT: ${{ secrets.GH_PAT }}
       run: |
         mkdir -p ~/.ssh
-        echo "$DEPLOY_KEY" > ~/.ssh/deploy_key
+        echo "$SSH_KEY" > ~/.ssh/deploy_key
         chmod 600 ~/.ssh/deploy_key
-        ssh-keyscan -H "$DEPLOY_HOST" >> ~/.ssh/known_hosts
+        ssh-keyscan -p "$SSH_PORT" -H "$SSH_HOST" >> ~/.ssh/known_hosts
 
         rsync -avz --delete \
-          -e "ssh -i ~/.ssh/deploy_key" \
+          -e "ssh -p $SSH_PORT -i ~/.ssh/deploy_key" \
           --exclude='.git' \
           --exclude='venv' \
           --exclude='node_modules' \
           --exclude='.env' \
           --exclude='__pycache__' \
           --exclude='*.db' \
-          ./ "${DEPLOY_USER}@${DEPLOY_HOST}:${DEPLOY_PATH}/"
+          ./ "${SSH_USER}@${SSH_HOST}:${DEPLOY_PATH}/"
 
-        ssh -i ~/.ssh/deploy_key "${DEPLOY_USER}@${DEPLOY_HOST}" \
+        ssh -p "$SSH_PORT" -i ~/.ssh/deploy_key "${SSH_USER}@${SSH_HOST}" \
           "cd ${DEPLOY_PATH} && \
           python -m venv venv && \
           source venv/bin/activate && \
@@ -176,7 +180,7 @@ jobs:
 
     - name: Deployment skipped
       if: steps.deploy-config.outputs.ready != 'true'
-      run: echo "Skipping deployment because DEPLOY_* secrets are not configured."
+      run: echo "Skipping deployment because SSH_* (or fallback DEPLOY_*) secrets are not configured."
 
   notify:
     needs: [deploy]
@@ -190,7 +194,7 @@ jobs:
         if [ "${{ needs.deploy.result }}" == "success" ] && [ "${{ needs.deploy.outputs.deployed }}" == "true" ]; then
           echo "✅ EGE-Bot deployment successful!"
         elif [ "${{ needs.deploy.outputs.deployed }}" != "true" ]; then
-          echo "⏭️ EGE-Bot deployment skipped: DEPLOY_* secrets are missing."
+          echo "⏭️ EGE-Bot deployment skipped: SSH_* (or fallback DEPLOY_*) secrets are missing."
         else
           echo "❌ EGE-Bot deployment failed!"
         fi
