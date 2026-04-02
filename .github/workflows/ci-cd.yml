@@ -106,6 +106,8 @@ jobs:
     runs-on: ubuntu-latest
     name: Deploy to Production
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    outputs:
+      deployed: ${{ steps.deploy-config.outputs.ready }}
     timeout-minutes: 20
 
     steps:
@@ -117,19 +119,32 @@ jobs:
         name: frontend-build
         path: frontend/dist/
 
-    - name: Validate deploy secrets
+    - name: Check deploy configuration
+      id: deploy-config
       env:
         DEPLOY_KEY: ${{ secrets.DEPLOY_KEY }}
         DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
         DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
         DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
       run: |
-        test -n "$DEPLOY_KEY"
-        test -n "$DEPLOY_HOST"
-        test -n "$DEPLOY_USER"
-        test -n "$DEPLOY_PATH"
+        missing=0
+        for var in DEPLOY_KEY DEPLOY_HOST DEPLOY_USER DEPLOY_PATH; do
+          if [ -z "${!var}" ]; then
+            echo "Missing secret: $var"
+            missing=1
+          fi
+        done
+
+        if [ "$missing" -eq 0 ]; then
+          echo "ready=true" >> "$GITHUB_OUTPUT"
+          echo "Deploy configuration is complete."
+        else
+          echo "ready=false" >> "$GITHUB_OUTPUT"
+          echo "Deploy will be skipped because required secrets are missing."
+        fi
 
     - name: Deploy to server
+      if: steps.deploy-config.outputs.ready == 'true'
       env:
         DEPLOY_KEY: ${{ secrets.DEPLOY_KEY }}
         DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
@@ -159,6 +174,10 @@ jobs:
           pip install -r requirements.txt && \
           systemctl restart ege-bot"
 
+    - name: Deployment skipped
+      if: steps.deploy-config.outputs.ready != 'true'
+      run: echo "Skipping deployment because DEPLOY_* secrets are not configured."
+
   notify:
     needs: [deploy]
     runs-on: ubuntu-latest
@@ -168,8 +187,10 @@ jobs:
     steps:
     - name: Deployment Status
       run: |
-        if [ "${{ needs.deploy.result }}" == "success" ]; then
+        if [ "${{ needs.deploy.result }}" == "success" ] && [ "${{ needs.deploy.outputs.deployed }}" == "true" ]; then
           echo "✅ EGE-Bot deployment successful!"
+        elif [ "${{ needs.deploy.outputs.deployed }}" != "true" ]; then
+          echo "⏭️ EGE-Bot deployment skipped: DEPLOY_* secrets are missing."
         else
           echo "❌ EGE-Bot deployment failed!"
         fi

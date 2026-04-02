@@ -1,5 +1,7 @@
 from typing import Optional
 
+import re
+
 from flask import Blueprint, jsonify, request
 from flask_jwt_extended import jwt_required, get_jwt_identity
 
@@ -13,6 +15,11 @@ answers_bp = Blueprint("answers", __name__, url_prefix="/api/answers")
 def normalize_answer(answer: str) -> str:
     """Normalize answer for comparison."""
     return answer.strip().lower()
+
+
+def normalize_multiple_answer(answer: str) -> str:
+    """Normalize matching-style answers like 1,4,5 -> 145."""
+    return re.sub(r"[\s,;]+", "", answer).strip().lower()
 
 
 def check_answer(question: Question, user_answer: str) -> bool:
@@ -35,9 +42,15 @@ def check_answer(question: Question, user_answer: str) -> bool:
         # For text answers - exact match after normalization
         return normalize_answer(question.answer) == normalize_answer(user_answer)
     elif question.question_type == "multiple":
-        # For multiple choice - split by comma and compare sets
-        correct_set = {x.strip().lower() for x in question.answer.split(",")}
-        user_set = {x.strip().lower() for x in user_answer.split(",")}
+        # Support both comma-separated and contiguous formats.
+        normalized_correct = normalize_answer(question.answer)
+        normalized_user = normalize_answer(user_answer)
+        if "," not in normalized_correct and "," not in normalized_user:
+            return normalize_multiple_answer(question.answer) == normalize_multiple_answer(user_answer)
+
+        splitter = re.compile(r"[,;]")
+        correct_set = {x.strip().lower() for x in splitter.split(question.answer) if x.strip()}
+        user_set = {x.strip().lower() for x in splitter.split(user_answer) if x.strip()}
         return correct_set == user_set
     else:
         return False
@@ -50,9 +63,24 @@ def check_answer_with_source(question: Question, user_answer: str) -> bool:
         and question.external_id
         and question.answer == NeoFamilyQuestionLoader.REMOTE_CHECK_PLACEHOLDER
     ):
-        remote_result = NeoFamilyQuestionLoader.check_task_answer(question.external_id, user_answer)
-        if remote_result is not None:
-            return remote_result
+        candidates = [user_answer]
+
+        # NeoFamily matching tasks are often entered as 1,4,5 but checked as 145.
+        if question.question_type == "multiple":
+            compact_answer = normalize_multiple_answer(user_answer)
+            if compact_answer and compact_answer != user_answer:
+                candidates.append(compact_answer)
+
+        remote_false_seen = False
+        for candidate in candidates:
+            remote_result = NeoFamilyQuestionLoader.check_task_answer(question.external_id, candidate)
+            if remote_result is True:
+                return True
+            if remote_result is False:
+                remote_false_seen = True
+
+        if remote_false_seen:
+            return False
 
     return check_answer(question, user_answer)
 

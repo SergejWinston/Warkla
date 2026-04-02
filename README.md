@@ -1,285 +1,461 @@
-# EGE-Bot: Интерактивный помощник для подготовки к ЕГЭ
+# Warkla
 
-Веб-приложение + Flask API для подготовки школьников к ЕГЭ. Сервис генерирует вопросы по выбранному предмету, проверяет ответы, ведет статистику прогресса и объясняет ошибки.
+Полноценная платформа для подготовки к ЕГЭ с веб-интерфейсом, JWT-авторизацией, статистикой прогресса и синхронизацией заданий из NeoFamily API.
 
-## Основные возможности
+Проект состоит из:
+- Flask backend API (Python + SQLAlchemy)
+- React frontend (Vite + Tailwind)
+- SQLite по умолчанию
+- Redis (опционально, для production-кэша)
 
-- **Выбор предмета и темы** - Пользователь выбирает предмет (русский язык, математика, информатика, обществознание)
-- **Генерация вопросов** - База готовых вопросов (загружается из NeoFamily API с кешированием)
-- **Продвинутая сортировка** ⭐ - Множественная сортировка по различным полям (ID, сложность, дата и др.)
-- **Разные типы вопросов** - выбор ответа, ввод числа, краткий текстовый ответ, множественный выбор
-- **Проверка ответов** - Автоматическая проверка правильности с объяснением ошибок
-- **Статистика и прогресс** - Процент правильных ответов по предметам и темам, визуализация графиков
-- **Веб-приложение** - React/Vite приложение для подробной аналитики
+## Что умеет проект
 
-## Технический стек
+- Регистрация и вход пользователей (JWT)
+- Выбор предмета и темы
+- Получение задач из локального task-bank (который синхронизируется с NeoFamily)
+- Проверка ответов:
+  - локально для стандартных случаев
+  - через NeoFamily `/task/check/{id}` для задач с удаленной валидацией
+- История ответов с удалением записей
+- Прогресс и статистика (точность, активность, стрик, лидерборд)
+- Баннеры предметов из NeoFamily
+- Сортировка задач по нескольким полям
 
-### Backend
-- Flask, Flask-SQLAlchemy, Flask-JWT-Extended
-- Redis для кеширования
-- SQLite (по умолчанию)
+## Архитектура
 
-### Frontend
-- React/Vite
-- TailwindCSS
-
-### CI/CD
-- GitHub Actions
-
-## Локальный запуск
-
-### Требования
-- Python 3.11+
-- pip
-- Node.js 16+ (для фронтенда)
-
-### Установка и запуск Backend
-
-```bash
-# 1. Клонируйте репозиторий
-git clone https://github.com/your-repo/ege-bot.git
-cd ege-bot
-
-# 2. Создайте виртуальную среду
-python -m venv venv
-source venv/bin/activate  # Linux/Mac
-# или на Windows:
-# venv\Scripts\activate
-
-# 3. Установите зависимости
-pip install -r requirements.txt
-
-# 4. Создайте .env
-cp .env.example .env
-
-# 5. Запустите приложение
-python run.py flask
+```text
+React (frontend, Vite dev server)
+        |
+        |  /api/*
+        v
+Flask API (app/routes/*)
+        |
+        +--> SQLite (users, subjects, themes, questions, user_answers, user_stats, banners)
+        |
+        +--> NeoFamily API (subjects, tasks, banners, solution, answer-check)
+        |
+        +--> Redis cache (только если FLASK_ENV=production)
 ```
 
-Приложение будет доступно на `http://localhost:5000`
+Ключевой поток данных:
+1. При старте backend выполняет `db.create_all()`, seed fallback-предметов и запускает фоновые sync-задачи.
+2. Фоновый sync подтягивает предметы/баннеры/задачи из NeoFamily в локальную БД.
+3. Frontend работает с локальным API (`/api/...`) и не ходит напрямую во внешний сервис.
 
-### Установка и запуск Frontend
+## Технологический стек
+
+### Backend
+- Python 3.11+
+- Flask, Flask-CORS
+- Flask-SQLAlchemy, Flask-Migrate
+- Flask-JWT-Extended
+- requests
+- redis (опционально)
+
+### Frontend
+- React 18
+- React Router 6
+- Vite 5
+- TailwindCSS 3
+- Axios
+- Zustand
+
+### Инфраструктура
+- Docker, Docker Compose
+- Nginx (в deploy-конфиге)
+- GitHub Actions (CI/CD + Docker publish)
+
+## Структура репозитория
+
+```text
+.
+├─ app/
+│  ├─ __init__.py           # create_app, health-check, init DB, startup sync
+│  ├─ config.py             # конфигурация из env
+│  ├─ models.py             # SQLAlchemy модели
+│  ├─ routes/               # API endpoints
+│  │  ├─ auth.py
+│  │  ├─ subjects.py
+│  │  ├─ questions.py
+│  │  ├─ answers.py
+│  │  └─ stats.py
+│  └─ services/
+│     ├─ question_loader.py # интеграция с NeoFamily, sync, answer check
+│     └─ cache.py           # Redis wrapper
+├─ frontend/
+│  ├─ src/
+│  │  ├─ pages/
+│  │  ├─ components/
+│  │  ├─ hooks/
+│  │  └─ lib/api.js
+│  └─ vite.config.mjs       # proxy /api -> localhost:5000
+├─ migrations/              # Alembic migrations
+├─ deploy/nginx-docker.conf
+├─ docker-compose.yml
+├─ Dockerfile
+├─ run.py
+└─ requirements.txt
+```
+
+## Быстрый старт (локально)
+
+## 1. Требования
+
+- Python 3.11+
+- Node.js 18+ (рекомендуется)
+- npm
+- Git
+- (опционально) Redis
+
+## 2. Установка
+
+### Backend
+
+```bash
+# из корня репозитория
+python -m venv .venv
+
+# Windows PowerShell
+.\.venv\Scripts\Activate.ps1
+
+# Linux/macOS
+source .venv/bin/activate
+
+pip install --upgrade pip
+pip install -r requirements.txt
+```
+
+### Frontend
 
 ```bash
 cd frontend
-
-# 1. Установите зависимости
 npm install
-
-# 2. Запустите dev сервер
-npm run dev
+cd ..
 ```
 
-Фронтенд будет доступен на `http://localhost:5173`
+## 3. Настройка окружения
 
-### Запуск Backend
+Создайте `.env` из шаблона:
+
+```bash
+# Linux/macOS
+cp .env.example .env
+
+# Windows PowerShell
+Copy-Item .env.example .env
+```
+
+Для локального запуска достаточно значений по умолчанию.
+
+## 4. Запуск
+
+### Backend API
 
 ```bash
 python run.py flask
 ```
 
-## API Endpoints
+Backend будет доступен на `http://localhost:5000`.
 
-### Authentication
-- `POST /api/auth/register` - Регистрация
-- `POST /api/auth/login` - Логин
-- `GET /api/auth/me` - Текущий пользователь (protected)
+Проверка:
 
-### Subjects & Themes
-- `GET /api/subjects` - Список предметов
-- `GET /api/subjects/<id>/themes` - Темы предмета
-- `GET /api/subjects/<id>/progress` - Прогресс (protected)
+```bash
+curl http://localhost:5000/api/health
+```
 
-### Questions
-- `GET /api/questions?subject_slug=<slug>&theme_id=<id>` - Получить вопросы (protected)
-  - **Поддержка сортировки**: `sort[field]=order` (множественные параметры)
-  - Примеры:
-    - `?subject_slug=russkiy-yazyk&sort[id]=asc` - по ID
-    - `?subject_slug=russkiy-yazyk&sort[difficulty]=desc&sort[id]=asc` - по сложности и ID
-    - `?subject_slug=russkiy-yazyk&theme_id=43&sort[created_at]=desc` - с фильтром
-  - Доступные поля: `id`, `created_at`, `updated_at`, `difficulty`, `external_id`, `theme_id`, `question_type`
-  - 📘 [Подробная документация по сортировке](SORTING.md)
-- `GET /api/questions/<id>/solution` - Вопрос с ответом (protected)
+Ожидаемый ответ:
 
-### Answers
-- `POST /api/answers` - Отправить ответ (protected)
-- `GET /api/answers/history` - История ответов (protected)
+```json
+{"status":"ok"}
+```
 
-### Statistics
-- `GET /api/stats` - Общая статистика (protected)
-- `GET /api/stats/subjects` - По предметам (protected)
-- `GET /api/stats/streak` - Дневной стрик (protected)
+### Frontend
 
-## Веб-приложение (Frontend)
+```bash
+cd frontend
+npm run dev
+```
 
-React/Vite приложение с полным функционалом:
+Frontend будет доступен на `http://localhost:5173`.
 
-### Страницы:
-- **Login** - Регистрация и авторизация
-- **Dashboard** - Главная панель с статистикой
-- **Quiz** - Решение вопросов
-- **Stats** - Подробная статистика по предметам
-- **History** - История всех ответов с пагинацией
-- **Leaderboard** - Таблица лучших игроков
+Vite-прокси направляет `/api/*` на `http://localhost:5000`.
 
-### Компоненты:
-- QuestionCard - Отображение вопроса и ввод ответа
-- ResultCard - Результат проверки ответа
-- SubjectSelector - Выбор предмета и темы
-- ProtectedRoute - Защита маршрутов на основе аутентификации
+## Конфигурация через .env
 
-Подробнее см. [Frontend README](./frontend/README.md)
+Основные переменные:
+
+| Переменная | По умолчанию | Назначение |
+|---|---|---|
+| `FLASK_ENV` | `development` | Режим приложения; `production` также включает Redis-кэш при доступном Redis |
+| `SECRET_KEY` | `dev-secret-key` | Flask secret |
+| `JWT_SECRET_KEY` | `dev-jwt-secret` | Подпись JWT |
+| `JWT_ACCESS_TOKEN_EXPIRES_DAYS` | `30` | Срок жизни access token |
+| `DATABASE_URL` | `sqlite:///.../warkla.db` (в коде) | Подключение к БД |
+| `CORS_ORIGINS` | `*` | CORS для `/api/*` |
+| `UPLOAD_FOLDER` | `uploads` | Папка загрузок |
+| `MAX_CONTENT_LENGTH` | `5242880` | Макс. размер upload (байт) |
+| `REDIS_URL` | `redis://localhost:6379/0` | Redis для кэша |
+| `NEOFAMILY_API_BASE` | `https://backend.neofamily.ru/api` | Базовый URL внешнего API |
+| `NEOFAMILY_SYNC_ENABLED` | `true` | Включение фоновой синхронизации |
+| `NEOFAMILY_BOOTSTRAP_PAGES` | `15` | Глубина первичной загрузки |
+| `NEOFAMILY_BOOTSTRAP_PER_PAGE` | `15` | Размер страницы для bootstrap |
+| `NEOFAMILY_PERIODIC_PAGES` | `2` | Глубина периодической синхронизации |
+| `NEOFAMILY_SYNC_INTERVAL_SECONDS` | `21600` | Интервал периодического sync |
+
+Примечание по БД: в `.env.example` указан `sqlite:///ege.db`; если не задавать `DATABASE_URL`, код использует `warkla.db` в корне проекта.
+
+## База данных и миграции
+
+В проекте используется смешанный подход:
+
+- На старте приложения выполняется `db.create_all()` и patch-совместимость SQLite-схемы.
+- Alembic/Flask-Migrate также присутствуют для версионируемых миграций.
+
+Команды миграций:
+
+```bash
+flask --app run.py db current
+flask --app run.py db upgrade
+flask --app run.py db migrate -m "описание изменений"
+```
+
+## API (краткий справочник)
+
+Базовый префикс: `/api`.
+
+## Auth
+
+| Метод | Endpoint | Auth | Описание |
+|---|---|---|---|
+| `POST` | `/auth/register` | Нет | Регистрация |
+| `POST` | `/auth/login` | Нет | Логин по username/email |
+| `GET` | `/auth/me` | Да | Текущий пользователь |
+
+## Subjects
+
+| Метод | Endpoint | Auth | Описание |
+|---|---|---|---|
+| `GET` | `/subjects` | Нет | Активные предметы |
+| `GET` | `/subjects/<subject_id>` | Нет | Предмет по ID |
+| `GET` | `/subjects/by-slug/<subject_slug>` | Нет | Предмет по slug |
+| `GET` | `/subjects/<subject_id>/themes` | Нет | Темы предмета |
+| `GET` | `/subjects/<subject_slug>/banner` | Нет | Баннер предмета |
+| `POST` | `/subjects/sync` | Нет | Ручной запуск sync (bootstrap с ограничением страниц) |
+| `GET` | `/subjects/<subject_id>/progress` | Да | Прогресс пользователя по предмету |
+
+## Questions
+
+| Метод | Endpoint | Auth | Описание |
+|---|---|---|---|
+| `GET` | `/questions` | Да | Пагинация задач из локального task-bank |
+| `GET` | `/questions/<question_id>` | Да | Задача без ответа |
+| `GET` | `/questions/<question_id>/solution` | Да | Решение/объяснение (при необходимости подтягивается извне) |
+| `GET` | `/questions/count` | Нет | Количество задач (всего и по предметам) |
+
+Параметры `/questions`:
+
+- `subject_slug` (обязательный)
+- `theme_id` (опционально)
+- `page`, `per_page`
+- сортировка:
+  - современный формат: `sort[field]=asc|desc` (можно несколько)
+  - legacy: `sort_by=field&sort_order=asc|desc`
+
+Доступные сортируемые поля:
+- `id`
+- `created_at`
+- `updated_at`
+- `difficulty`
+- `external_id`
+- `theme_id`
+- `question_type`
+
+Пример:
+
+```http
+GET /api/questions?subject_slug=russkiy-yazyk&page=1&per_page=15&sort[difficulty]=desc&sort[id]=asc
+Authorization: Bearer <token>
+```
+
+## Answers
+
+| Метод | Endpoint | Auth | Описание |
+|---|---|---|---|
+| `POST` | `/answers` | Да | Отправка ответа на задачу |
+| `GET` | `/answers/history` | Да | История ответов (limit/offset + фильтры) |
+| `DELETE` | `/answers/history/<answer_id>` | Да | Удаление записи из истории с коррекцией статистики |
+| `GET` | `/answers/stats` | Да | Агрегированная статистика ответов |
+
+## Stats
+
+| Метод | Endpoint | Auth | Описание |
+|---|---|---|---|
+| `GET` | `/stats` | Да | Общая статистика + активность за 7 дней |
+| `GET` | `/stats/subjects` | Да | Статистика по предметам |
+| `GET` | `/stats/subject/<subject_id>` | Да | Детальная статистика по предмету |
+| `GET` | `/stats/theme/<theme_id>` | Да | Статистика по теме |
+| `GET` | `/stats/streak` | Да | Дневной стрик |
+| `GET` | `/stats/leaderboard` | Нет | Лидерборд |
+
+## Health
+
+| Метод | Endpoint | Auth | Описание |
+|---|---|---|---|
+| `GET` | `/health` | Нет | Health-check |
+
+## Пример сценария через API
+
+1. Зарегистрироваться
+2. Получить `access_token`
+3. Запросить предметы
+4. Выбрать `subject_slug` и получить задачи
+5. Отправить ответ
+6. Проверить историю и статистику
+
+Пример (упрощенно):
+
+```bash
+# Регистрация
+curl -X POST http://localhost:5000/api/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{"username":"demo","email":"demo@example.com","password":"secret123"}'
+
+# Логин
+curl -X POST http://localhost:5000/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"login":"demo","password":"secret123"}'
+```
+
+Дальше используйте токен в заголовке:
+
+```http
+Authorization: Bearer <access_token>
+```
 
 ## Docker
 
-### Docker Compose (рекомендуется для быстрого старта)
+## Docker Compose (рекомендуется)
 
 ```bash
-# 1. Клонируйте репозиторий
-git clone https://github.com/your-repo/ege-bot.git
-cd ege-bot
-
-# 2. Создайте .env файл
-cp .env.example .env
-
-# 3. Запустите с Docker Compose (включает Redis)
-docker-compose up -d
-
-# 4. Проверьте логи
-docker-compose logs -f app
+docker compose up -d --build
+docker compose ps
+docker compose logs -f app
 ```
 
-Docker Compose запустит:
-- **EGE-Bot приложение** (Flask API) на `http://localhost:5000`
-- **Redis** для кеширования на `localhost:6379`
+Поднимаются сервисы:
+- `app` (Flask API)
+- `redis` (кэш)
 
-### Standalone Docker
+Остановка:
 
 ```bash
-# Сборка образа
-docker build -t ege-bot .
-
-# Запуск без Redis (для дебага)
-docker run -p 5000:5000 ege-bot
-
-# Запуск с Redis
-docker run -p 5000:5000 \
-  -e REDIS_URL=redis://redis:6379/0 \
-  ege-bot
+docker compose down
 ```
 
-### Production Environment
+## Docker image
 
-Для production переменные окружения:
-- `FLASK_ENV=production` - Включает Redis кеширование и оптимизации
-- `REDIS_URL=redis://hostname:6379/0` - Подключение к Redis
-- `JWT_SECRET_KEY=your-secret-key` - JWT токен
-
-## CI/CD и Авторазвертка
-
-### GitHub Actions Workflows
-
-Проект поддерживает полностью автоматическую развертку с GitHub Actions:
-
-**1. ci-cd.yml** - Backend CI/CD:
-   - ✅ Линтер (flake8) для Python кода
-   - ✅ Сборка фронтенда (Vite)
-   - ✅ Тесты (если существуют)
-   - ✅ Автоматическая развертка Backend на сервер
-   - ✅ Реальная работа: собирает и развертывает backend + frontend
-
-**2. frontend.yml** - Frontend только:
-   - ✅ Линтер (ESLint, опционально)
-   - ✅ Сборка Vite проекта
-   - ✅ Проверка артефактов (dist/)
-   - ✅ Деплой фронтенда на веб-сервер (Nginx)
-   - ✅ Срабатывает: только при изменении файлов в `frontend/`
-
-**3. docker.yml** - Docker образ:
-   - ✅ Сборка Docker образа
-   - ✅ Пуш в GitHub Container Registry (ghcr.io)
-   - ✅ Кеширование слоев для быстрой сборки
-
-### Как работает развертка
-
-**На Push в main ветку:**
-```
-Автоматический цикл:
-  1. Линтинг Backend (flake8)
-  2. Сборка Frontend (npm run build)
-  3. Запуск тестов
-  4. SSH деплой на сервер
-   5. Перезагрузка сервисов (Flask API + Nginx)
-  ✅ Готово!
+```bash
+docker build -t warkla:local .
+docker run --rm -p 5000:5000 --env-file .env warkla:local
 ```
 
-**Если меняются только файлы frontend/:**
+## CI/CD (GitHub Actions)
+
+В репозитории есть workflow-файлы:
+
+- `.github/workflows/ci-cd.yml`
+  - backend lint/test
+  - frontend build
+  - deploy на `main` при наличии секретов
+
+- `.github/workflows/frontend.yml`
+  - frontend lint/build
+  - отдельный frontend deploy
+
+- `.github/workflows/docker.yml`
+  - сборка и push Docker-образа в GHCR (`ghcr.io/sergejwinston/warkla`)
+
+- `.github/workflows/build-deploy.yml`
+  - legacy manual workflow (`workflow_dispatch`)
+
+### Секреты для deploy
+
+В зависимости от сценария используются:
+
+- `DEPLOY_HOST`
+- `DEPLOY_USER`
+- `DEPLOY_KEY`
+- `DEPLOY_PATH`
+- `SSH_HOST`, `SSH_USER`, `SSH_KEY`, `SSH_PORT` (legacy)
+- `GH_PAT` (legacy deploy через GHCR)
+
+## Тестирование
+
+### Быстрая проверка сортировки
+
+```bash
+python test_sorting.py
 ```
-Быстрый фронтенд-деплой:
-  1. npm install
-  2. npm run build → dist/
-  3. rsync dist/ на сервер → Nginx
-  ✅ Быстрый деплой без перестройки Backend!
+
+### Pytest
+
+```bash
+pytest -v
 ```
 
-### Настройка авторазвертки
+### Линтинг backend
 
-1. **Добавьте Secrets в GitHub репозитории:**
-   ```
-   Settings → Secrets and variables → Actions → New repository secret
-   ```
+```bash
+flake8 app
+```
 
-   Требуемые secrets:
-   - `DEPLOY_HOST` - IP адрес сервера
-   - `DEPLOY_USER` - SSH пользователь
-   - `DEPLOY_KEY` - Приватный SSH ключ
-   - `DEPLOY_PATH` - Путь на сервере (напр. `/opt/ege-bot`)
+### Линтинг frontend
 
-2. **Подготовка сервера:**
-   ```bash
-   # На сервере:
-   mkdir -p /opt/ege-bot
-   chmod 755 /opt/ege-bot
+```bash
+cd frontend
+npm run lint
+```
 
-   # Создайте systemd сервис для ege-bot
-   sudo nano /etc/systemd/system/ege-bot.service
-   ```
+## Частые проблемы
 
-3. **Systemd сервис (ege-bot.service):**
-   ```ini
-   [Unit]
-   Description=EGE-Bot Service
-   After=network.target
+### 1. Пустой список задач
 
-   [Service]
-   Type=simple
-   User=appuser
-   WorkingDirectory=/opt/ege-bot
-   Environment="PATH=/opt/ege-bot/venv/bin"
-   ExecStart=/opt/ege-bot/venv/bin/python run.py flask
-   Restart=always
-   RestartSec=10
-   StandardOutput=journal
-   StandardError=journal
+Причина: локальный task-bank еще не синхронизирован.
 
-   [Install]
-   WantedBy=multi-user.target
-   ```
+Решение:
+- подождать завершения фонового sync после старта
+- либо вызвать `POST /api/subjects/sync` вручную
 
-### Redis кеширование
+### 2. Redis не используется
 
-Redis кеширование **автоматически включается в production** (`FLASK_ENV=production`):
+Redis-кэш включается только если:
+- `FLASK_ENV=production`
+- пакет `redis` установлен
+- `REDIS_URL` доступен
 
-- Кешируются вопросы из NeoFamily API на 24 часа
-- Случайные вопросы кешируются на 1 час
-- Кеширование опционально - работает если Redis доступен
-- Для дебага Redis не требуется
+В `development` режиме кэш намеренно отключен.
 
-Преимущества:
-- ⚡ 10x более быстрое получение вопросов
-- 📉 Снижение нагрузки на внешнее API
-- 💾 Экономия трафика
+### 3. Ошибки CORS
 
-## Лицензия
+Проверьте `CORS_ORIGINS` в `.env`.
 
-MIT License
+### 4. Проблемы с токеном/401
+
+Проверьте:
+- срок жизни JWT (`JWT_ACCESS_TOKEN_EXPIRES_DAYS`)
+- корректность `JWT_SECRET_KEY`
+- заголовок `Authorization: Bearer <token>`
+
+## Production рекомендации
+
+- Обязательно заменить `SECRET_KEY` и `JWT_SECRET_KEY`
+- Ограничить `CORS_ORIGINS` конкретным доменом
+- Использовать HTTPS (см. `deploy/nginx-docker.conf`)
+- Не коммитить `.env` и файлы базы
+- Мониторить логи и health-check
+
+## Дополнительные документы
+
+- `DEPLOYMENT.md` — заметки по развёртыванию
+- `frontend/README.md` — frontend-часть отдельно
+- `migrations/README.md` — базовые команды миграций

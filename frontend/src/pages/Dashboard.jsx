@@ -58,18 +58,6 @@ const DEFAULT_SORT_BY = 'id'
 const DEFAULT_SORT_ORDER = 'asc'
 const DEFAULT_PER_PAGE = 15
 
-const sanitizeHtml = (rawHtml) => {
-  if (!rawHtml) return ''
-
-  return String(rawHtml)
-    .replace(/<script[\s\S]*?>[\s\S]*?<\/script>/gi, '')
-    .replace(/<style[\s\S]*?>[\s\S]*?<\/style>/gi, '')
-    .replace(/\son[a-z]+\s*=\s*"[^"]*"/gi, '')
-    .replace(/\son[a-z]+\s*=\s*'[^']*'/gi, '')
-    .replace(/\son[a-z]+\s*=\s*[^\s>]+/gi, '')
-    .replace(/javascript:/gi, '')
-}
-
 const withAlpha = (color, alphaSuffix) => {
   if (typeof color !== 'string') return null
   if (color.startsWith('#') && color.length === 7) {
@@ -103,7 +91,6 @@ export default function Dashboard() {
   const [isPracticeStarted, setIsPracticeStarted] = useState(false)
   const [resultsByQuestion, setResultsByQuestion] = useState({})
   const [submittingQuestionId, setSubmittingQuestionId] = useState(null)
-  const [answersCount, setAnswersCount] = useState(0)
   const [noTasks, setNoTasks] = useState(false)
 
   const { themes, isLoading: themesLoading, error: themesError } = useThemes(selectedSubject?.id)
@@ -135,7 +122,6 @@ export default function Dashboard() {
   const resetPracticeView = () => {
     setResultsByQuestion({})
     setSubmittingQuestionId(null)
-    setAnswersCount(0)
     setNoTasks(false)
   }
 
@@ -201,15 +187,10 @@ export default function Dashboard() {
 
     try {
       const result = await submit(questionId, answer)
-      setResultsByQuestion((prev) => {
-        if (!Object.prototype.hasOwnProperty.call(prev, questionId)) {
-          setAnswersCount((count) => count + 1)
-        }
-        return {
-          ...prev,
-          [questionId]: result,
-        }
-      })
+      setResultsByQuestion((prev) => ({
+        ...prev,
+        [questionId]: result,
+      }))
     } catch (error) {
       console.error('Error submitting answer:', error)
     } finally {
@@ -532,21 +513,6 @@ export default function Dashboard() {
                   </div>
 
               <SubjectBanner banner={banner} />
-
-              {answersCount > 0 && (
-                <div className="bg-pixel-blue/30 border-4 border-pixel-blue-dark shadow-pixel p-5">
-                  <p className="font-main font-semibold text-pixel-dark flex items-center gap-2">
-                    <span className="text-xl">✅</span>
-                    Проверено заданий: <strong className="font-cute text-lg">{answersCount}</strong>
-                  </p>
-                  {pagination && (
-                    <p className="font-main text-sm text-pixel-dark/70 mt-2">
-                      Страница {pagination.currentPage || 1} из {pagination.totalPages || 1}
-                    </p>
-                  )}
-                </div>
-              )}
-
               {(questionError || submitError) && (
                 <div className="bg-pixel-red/20 border-4 border-pixel-red-dark p-5 animate-wiggle">
                   <p className="font-main font-semibold text-pixel-red-dark flex items-center gap-2">
@@ -568,10 +534,18 @@ export default function Dashboard() {
                   {questions.map((questionItem, index) => {
                     const result = resultsByQuestion[questionItem.id]
                     const isSubmitting = submittingQuestionId === questionItem.id
-                    const safeHintHtml = sanitizeHtml(result?.solution_html || result?.explanation)
 
                     return (
-                      <div key={questionItem.id} className="bg-white border-4 border-pixel-dark shadow-pixel p-5 md:p-6 space-y-4">
+                      <div
+                        key={questionItem.id}
+                        className={`border-4 shadow-pixel p-5 md:p-6 space-y-4 ${
+                          result
+                            ? result.is_correct
+                              ? 'bg-pixel-green/20 border-pixel-green-dark'
+                              : 'bg-pixel-red/15 border-pixel-red-dark'
+                            : 'bg-white border-pixel-dark'
+                        }`}
+                      >
                         <div className="flex flex-wrap items-center justify-between gap-3">
                           <div className="flex items-center gap-3">
                             <span className="text-2xl">#{index + 1}</span>
@@ -596,32 +570,8 @@ export default function Dashboard() {
                           question={questionItem}
                           onSubmit={handleAnswerSubmit}
                           isLoading={isSubmitting}
+                          result={result}
                         />
-
-                        {result && (
-                          <div
-                            className={`border-4 border-pixel-dark shadow-pixel p-5 ${
-                              result.is_correct
-                                ? 'bg-pixel-green/30'
-                                : 'bg-pixel-red/30'
-                            }`}
-                          >
-                            <p className="font-cute text-lg font-bold text-pixel-dark mb-2 flex items-center gap-2">
-                              {result.is_correct ? '🎉 Отлично!' : '💡 Подсказка'}
-                            </p>
-                            {!result.is_correct && result.correct_answer && (
-                              <p className="font-main text-pixel-dark mb-2">
-                                Правильный ответ: <strong className="font-cute">{result.correct_answer}</strong>
-                              </p>
-                            )}
-                            {safeHintHtml && (
-                              <div
-                                className="task-content font-main text-sm text-pixel-dark/80 mt-2"
-                                dangerouslySetInnerHTML={{ __html: safeHintHtml }}
-                              />
-                            )}
-                          </div>
-                        )}
                       </div>
                     )
                   })}

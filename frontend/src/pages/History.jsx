@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAnswerHistory } from '../hooks'
 import Layout from '../components/Layout'
+import { decodeHtmlEntities } from '../lib/text'
 
 export default function History() {
   const navigate = useNavigate()
@@ -69,7 +70,7 @@ export default function History() {
                 <div key={answer.id} className="bg-pixel-cream border-4 border-pixel-dark shadow-pixel p-5 hover:shadow-pixel-hover transition-all duration-100 transform hover:translate-x-1 hover:translate-y-1">
                   <div className="flex items-start justify-between gap-4">
                     <div className="flex-1">
-                      <h3 className="font-cute text-lg font-bold text-pixel-dark mb-3">{answer.question_text || 'Текст задания недоступен'}</h3>
+                      <h3 className="font-cute text-lg font-bold text-pixel-dark mb-3">{decodeHtmlEntities(answer.question_text) || 'Текст задания недоступен'}</h3>
                       <div className="font-main text-sm text-pixel-dark space-y-2">
                         <p className="flex items-start gap-2">
                           <span className="font-semibold">✍️ Твой ответ:</span>
@@ -103,8 +104,10 @@ export default function History() {
                       >
                         {deletingId === answer.id ? 'Удаляю...' : 'Удалить'}
                       </button>
-                      <div className={`text-5xl ${answer.is_correct ? 'animate-bounce-slow' : 'animate-wiggle'}`}>
-                        {answer.is_correct ? '✅' : '❌'}
+                      <div className={`px-3 py-2 border-3 border-pixel-dark shadow-pixel-sm font-main font-bold text-xs uppercase tracking-wide ${
+                        answer.is_correct ? 'bg-pixel-green text-pixel-dark' : 'bg-pixel-red text-white'
+                      }`}>
+                        {answer.is_correct ? 'Верно' : 'Ошибка'}
                       </div>
                     </div>
                   </div>

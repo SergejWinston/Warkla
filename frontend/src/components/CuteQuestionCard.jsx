@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { decodeHtmlEntities } from '../lib/text'
 
 export default function CuteQuestionCard({ question, onSubmit, result }) {
   const [answer, setAnswer] = useState('')
@@ -65,7 +66,7 @@ export default function CuteQuestionCard({ question, onSubmit, result }) {
           />
         ) : (
           <p className="font-main text-pixel-dark text-lg">
-            {question.text}
+            {decodeHtmlEntities(question.text)}
           </p>
         )}
       </div>

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { decodeHtmlEntities } from '../lib/text'
 
 const sanitizeHtml = (rawHtml) => {
   if (!rawHtml) return ''
@@ -31,17 +32,21 @@ const parseOptions = (optionsValue) => {
   return []
 }
 
-export default function QuestionCard({ question, onSubmit, isLoading }) {
+export default function QuestionCard({ question, onSubmit, isLoading, result }) {
   const [answer, setAnswer] = useState('')
   const [selectedOption, setSelectedOption] = useState('')
+  const [isHintVisible, setIsHintVisible] = useState(false)
 
   useEffect(() => {
     setAnswer('')
     setSelectedOption('')
+    setIsHintVisible(false)
   }, [question?.id])
 
   const safeHtmlText = useMemo(() => sanitizeHtml(question?.html_text), [question?.html_text])
   const options = useMemo(() => parseOptions(question?.options), [question?.options])
+  const safeHintHtml = useMemo(() => sanitizeHtml(result?.solution_html), [result?.solution_html])
+  const hasHint = Boolean(safeHintHtml || result?.explanation)
 
   const handleSubmit = () => {
     if (!question) return
@@ -79,7 +84,7 @@ export default function QuestionCard({ question, onSubmit, isLoading }) {
             dangerouslySetInnerHTML={{ __html: safeHtmlText }}
           />
         ) : (
-          <h2 className="font-cute text-2xl font-bold text-pixel-dark">{question.text}</h2>
+          <h2 className="font-cute text-2xl font-bold text-pixel-dark">{decodeHtmlEntities(question.text)}</h2>
         )}
       </div>
 
@@ -96,7 +101,7 @@ export default function QuestionCard({ question, onSubmit, isLoading }) {
                     : 'bg-white text-pixel-dark'
                 }`}
               >
-                {option}
+                {decodeHtmlEntities(String(option))}
               </button>
             ))}
           </div>
@@ -118,7 +123,7 @@ export default function QuestionCard({ question, onSubmit, isLoading }) {
             type="text"
             value={answer}
             onChange={(e) => setAnswer(e.target.value)}
-            placeholder="Введи ответы через запятую..."
+            placeholder="Введи ответ (обычно без пробелов и запятых)..."
             className="w-full px-4 py-3 bg-white border-4 border-pixel-dark shadow-pixel-sm focus:shadow-pixel-pink focus:border-pixel-pink-dark font-main transition-all disabled:opacity-50"
             disabled={isLoading}
           />
@@ -146,6 +151,42 @@ export default function QuestionCard({ question, onSubmit, isLoading }) {
           </>
         )}
       </button>
+
+      {result && !result.is_correct && (
+        <div className="mt-4 bg-pixel-blue/15 border-4 border-pixel-blue p-4 space-y-3">
+          <p className="font-main font-semibold text-pixel-dark">
+            Ответ не засчитан. Посмотри подсказку, чтобы понять, как решать это задание.
+          </p>
+
+          {hasHint ? (
+            <>
+              <button
+                onClick={() => setIsHintVisible((prev) => !prev)}
+                className="px-4 py-2 bg-pixel-blue hover:bg-pixel-blue-dark border-3 border-pixel-dark shadow-pixel-sm hover:shadow-pixel font-cute font-bold text-pixel-dark transition-all duration-100 transform hover:translate-x-1 hover:translate-y-1"
+              >
+                {isHintVisible ? 'Скрыть подсказку' : 'Показать подсказку'}
+              </button>
+
+              {isHintVisible && (
+                <div className="bg-white border-3 border-pixel-dark p-4">
+                  {safeHintHtml ? (
+                    <div
+                      className="task-content font-main text-pixel-dark"
+                      dangerouslySetInnerHTML={{ __html: safeHintHtml }}
+                    />
+                  ) : (
+                    <p className="font-main text-pixel-dark">{result.explanation}</p>
+                  )}
+                </div>
+              )}
+            </>
+          ) : (
+            <p className="font-main text-sm text-pixel-dark/70">
+              Подсказка пока недоступна для этого задания.
+            </p>
+          )}
+        </div>
+      )}
     </div>
   )
 }
