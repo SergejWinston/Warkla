@@ -8,13 +8,13 @@ export default function Stats() {
   const { leaderboard } = useLeaderboard()
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-purple-50 p-6">
+    <div className="app-shell min-h-screen p-6">
       <div className="max-w-6xl mx-auto">
         {/* Header */}
         <div className="mb-8">
           <button
             onClick={() => navigate('/dashboard')}
-            className="text-blue-500 hover:text-blue-700 font-medium mb-4"
+            className="text-sky-600 hover:text-sky-700 font-medium mb-4"
           >
             ← Назад к меню
           </button>

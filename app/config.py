@@ -16,6 +16,13 @@ class BaseConfig:
     UPLOAD_FOLDER = os.getenv("UPLOAD_FOLDER", str(BASE_DIR / "uploads"))
     MAX_CONTENT_LENGTH = int(os.getenv("MAX_CONTENT_LENGTH", 5 * 1024 * 1024))
 
+    NEOFAMILY_API_BASE = os.getenv("NEOFAMILY_API_BASE", "https://backend.neofamily.ru/api")
+    NEOFAMILY_SYNC_ENABLED = os.getenv("NEOFAMILY_SYNC_ENABLED", "true")
+    NEOFAMILY_BOOTSTRAP_PAGES = int(os.getenv("NEOFAMILY_BOOTSTRAP_PAGES", "15"))
+    NEOFAMILY_BOOTSTRAP_PER_PAGE = int(os.getenv("NEOFAMILY_BOOTSTRAP_PER_PAGE", "15"))
+    NEOFAMILY_PERIODIC_PAGES = int(os.getenv("NEOFAMILY_PERIODIC_PAGES", "2"))
+    NEOFAMILY_SYNC_INTERVAL_SECONDS = int(os.getenv("NEOFAMILY_SYNC_INTERVAL_SECONDS", str(6 * 60 * 60)))
+
 
 class DevelopmentConfig(BaseConfig):
     SQLALCHEMY_DATABASE_URI = os.getenv(

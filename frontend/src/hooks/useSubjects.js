@@ -79,3 +79,33 @@ export const useSubjectProgress = (subjectId) => {
 
   return { progress, isLoading, error }
 }
+
+export const useSubjectBanner = (subjectSlug) => {
+  const [banner, setBanner] = useState(null)
+  const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState(null)
+
+  useEffect(() => {
+    if (!subjectSlug) {
+      setBanner(null)
+      return
+    }
+
+    const fetchBanner = async () => {
+      setIsLoading(true)
+      setError(null)
+      try {
+        const { data } = await subjectsAPI.getBanner(subjectSlug)
+        setBanner(data?.data || null)
+      } catch (err) {
+        setError(err.response?.data?.error || 'Failed to fetch subject banner')
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    fetchBanner()
+  }, [subjectSlug])
+
+  return { banner, isLoading, error }
+}

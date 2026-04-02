@@ -1,62 +1,104 @@
 import { create } from 'zustand'
 import { authAPI } from '../lib/api'
+import {
+  clearStoredToken,
+  extractTokenFromAuthPayload,
+  extractUserFromAuthPayload,
+  getStoredToken,
+  storeToken,
+} from '../lib/authStorage'
 
-export const useAuthStore = create((set) => ({
+export const useAuthStore = create((set, get) => ({
   user: null,
-  token: localStorage.getItem('token'),
+  token: getStoredToken(),
   isLoading: false,
   error: null,
+  initialized: false,
 
   register: async (username, email, password) => {
     set({ isLoading: true, error: null })
     try {
       const { data } = await authAPI.register(username, email, password)
-      localStorage.setItem('token', data.access_token)
-      set({ token: data.access_token, user: data.user, isLoading: false })
+
+      const token = extractTokenFromAuthPayload(data)
+      const user = extractUserFromAuthPayload(data)
+      const tokenSaved = storeToken(token)
+
+      if (!tokenSaved) {
+        throw new Error('JWT token was not returned by API')
+      }
+
+      set({ token, user, isLoading: false })
       return true
     } catch (err) {
-      set({ error: err.response?.data?.error || 'Registration failed', isLoading: false })
+      set({ error: err.response?.data?.error || err.message || 'Registration failed', isLoading: false })
       return false
     }
   },
 
-  login: async (username, password) => {
+  login: async (loginValue, password) => {
     set({ isLoading: true, error: null })
     try {
-      const { data } = await authAPI.login(username, password)
-      localStorage.setItem('token', data.access_token)
-      set({ token: data.access_token, user: data.user, isLoading: false })
+      const { data } = await authAPI.login(loginValue, password)
+
+      const token = extractTokenFromAuthPayload(data)
+      const user = extractUserFromAuthPayload(data)
+      const tokenSaved = storeToken(token)
+
+      if (!tokenSaved) {
+        throw new Error('JWT token was not returned by API')
+      }
+
+      set({ token, user, isLoading: false })
       return true
     } catch (err) {
-      set({ error: err.response?.data?.error || 'Login failed', isLoading: false })
+      set({ error: err.response?.data?.error || err.message || 'Login failed', isLoading: false })
       return false
     }
   },
 
   logout: () => {
-    localStorage.removeItem('token')
+    clearStoredToken()
     set({ user: null, token: null, error: null })
   },
 
   getMe: async () => {
+    const token = get().token
+    if (!token) {
+      set({ initialized: true })
+      return false
+    }
     try {
       const { data } = await authAPI.getMe()
-      set({ user: data })
+      set({ user: data, initialized: true })
       return true
     } catch (err) {
-      set({ error: err.response?.data?.error || 'Failed to fetch user' })
+      // Token invalid - clear it
+      clearStoredToken()
+      set({ token: null, user: null, initialized: true, error: null })
       return false
     }
   },
 
-  isAuthenticated: () => {
-    const state = useAuthStore.getState()
-    return !!state.token && !!state.user
+  initAuth: async () => {
+    const { token, initialized, getMe } = get()
+    if (initialized) return
+
+    const storedToken = token || getStoredToken()
+    if (storedToken && storedToken !== token) {
+      set({ token: storedToken })
+    }
+
+    if (storedToken) {
+      await getMe()
+    } else {
+      set({ initialized: true })
+    }
   },
 }))
 
 export const useAuth = () => {
-  const { user, token, isLoading, error, register, login, logout, getMe } = useAuthStore()
+  const { user, token, isLoading, error, register, login, logout, getMe, initialized, initAuth } = useAuthStore()
   return {
     user,
     token,
@@ -66,6 +108,8 @@ export const useAuth = () => {
     login,
     logout,
     getMe,
-    isAuthenticated: !!token && !!user,
+    initialized,
+    initAuth,
+    isAuthenticated: !!token,
   }
 }

@@ -3,7 +3,7 @@ from flask_jwt_extended import jwt_required, get_jwt_identity
 
 from sqlalchemy import func
 from app.extensions import db
-from app.models import UserStat, UserAnswer, Question
+from app.models import User, UserStat, UserAnswer
 
 stats_bp = Blueprint("stats", __name__, url_prefix="/api/stats")
 
@@ -174,20 +174,25 @@ def get_leaderboard():
     """Get top users by accuracy."""
     limit = request.args.get("limit", 10, type=int)
 
+    correct_sum = func.coalesce(func.sum(func.cast(UserAnswer.is_correct, db.Integer)), 0)
+    total_count = func.count(UserAnswer.id)
+
     leaderboard = db.session.query(
-        db.func.user.username,
-        func.count(UserAnswer.id).label("total"),
-        func.sum(func.cast(UserAnswer.is_correct, db.Integer)).label("correct")
-    ).join(UserAnswer).group_by(UserAnswer.user_id).order_by(
-        (func.sum(func.cast(UserAnswer.is_correct, db.Integer)) / func.count(UserAnswer.id)).desc()
+        User.username.label("username"),
+        total_count.label("total"),
+        correct_sum.label("correct"),
+    ).join(UserAnswer, UserAnswer.user_id == User.id).group_by(
+        User.id, User.username
+    ).order_by(
+        (correct_sum * 1.0 / total_count).desc()
     ).limit(limit).all()
 
     return jsonify([
         {
             "username": l[0],
             "total_answers": l[1],
-            "correct_answers": l[2],
-            "accuracy": round((l[2] / l[1] * 100), 2) if l[1] > 0 else 0
+            "correct_answers": l[2] or 0,
+            "accuracy": round(((l[2] or 0) / l[1] * 100), 2) if l[1] > 0 else 0,
         }
         for l in leaderboard
     ])

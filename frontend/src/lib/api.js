@@ -31,21 +31,29 @@ api.interceptors.response.use(
 export const authAPI = {
   register: (username, email, password) =>
     api.post('/auth/register', { username, email, password }),
-  login: (username, password) =>
-    api.post('/auth/login', { username, password }),
+  login: (login, password) =>
+    api.post('/auth/login', { login, username: login, email: login, password }),
   getMe: () => api.get('/auth/me'),
 }
 
 export const subjectsAPI = {
   getAll: () => api.get('/subjects'),
+  getBySlug: (subjectSlug) => api.get(`/subjects/by-slug/${subjectSlug}`),
   getThemes: (subjectId) => api.get(`/subjects/${subjectId}/themes`),
+  getBanner: (subjectSlug) => api.get(`/subjects/${subjectSlug}/banner`),
+  sync: () => api.post('/subjects/sync'),
   getProgress: (subjectId) => api.get(`/subjects/${subjectId}/progress`),
 }
 
 export const questionsAPI = {
-  getRandom: (subjectId, themeId) =>
+  getPage: ({ subjectSlug, themeId, page = 1, perPage = 15 }) =>
     api.get('/questions', {
-      params: { subject: subjectId, theme: themeId },
+      params: {
+        subject_slug: subjectSlug,
+        theme_id: themeId,
+        page,
+        per_page: perPage,
+      },
     }),
   getById: (questionId) => api.get(`/questions/${questionId}`),
   getSolution: (questionId) => api.get(`/questions/${questionId}/solution`),
@@ -53,7 +61,7 @@ export const questionsAPI = {
 
 export const answersAPI = {
   submit: (questionId, userAnswer) =>
-    api.post('/answers', { question_id: questionId, user_answer: userAnswer }),
+    api.post('/answers', { question_id: questionId, answer: userAnswer }),
   getHistory: (params = {}) => api.get('/answers/history', { params }),
 }
 

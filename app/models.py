@@ -42,11 +42,16 @@ class Subject(db.Model):
     name = db.Column(db.String(255), nullable=False, unique=True)
     slug = db.Column(db.String(100), nullable=False, unique=True, index=True)
     description = db.Column(db.String(500), nullable=True)
+    color = db.Column(db.String(20), nullable=True)
+    external_id = db.Column(db.Integer, nullable=True, unique=True, index=True)
+    is_active = db.Column(db.Boolean, nullable=False, default=True)
+    synced_at = db.Column(db.DateTime, nullable=True)
 
     # Relationships
     themes = db.relationship("Theme", back_populates="subject", cascade="all, delete-orphan")
     questions = db.relationship("Question", back_populates="subject", cascade="all, delete-orphan")
     stats = db.relationship("UserStat", back_populates="subject", cascade="all, delete-orphan")
+    banners = db.relationship("Banner", back_populates="subject", cascade="all, delete-orphan")
 
     def to_dict(self) -> dict:
         return {
@@ -54,6 +59,9 @@ class Subject(db.Model):
             "name": self.name,
             "slug": self.slug,
             "description": self.description,
+            "color": self.color,
+            "external_id": self.external_id,
+            "is_active": self.is_active,
         }
 
 
@@ -65,11 +73,16 @@ class Theme(db.Model):
     name = db.Column(db.String(255), nullable=False)
     subject_id = db.Column(db.Integer, db.ForeignKey("subjects.id"), nullable=False, index=True)
     section_name = db.Column(db.String(255), nullable=True)  # e.g., "Орфография"
+    external_id = db.Column(db.Integer, nullable=True, index=True)
 
     # Relationships
     subject = db.relationship("Subject", back_populates="themes")
     questions = db.relationship("Question", back_populates="theme", cascade="all, delete-orphan")
     stats = db.relationship("UserStat", back_populates="theme", cascade="all, delete-orphan")
+
+    __table_args__ = (
+        db.UniqueConstraint("subject_id", "external_id", name="uq_theme_subject_external"),
+    )
 
     def to_dict(self) -> dict:
         return {
@@ -77,6 +90,7 @@ class Theme(db.Model):
             "name": self.name,
             "subject_id": self.subject_id,
             "section_name": self.section_name,
+            "external_id": self.external_id,
         }
 
 
@@ -86,15 +100,17 @@ class Question(db.Model):
 
     id = db.Column(db.Integer, primary_key=True)
     text = db.Column(db.Text, nullable=False)
+    html_text = db.Column(db.Text, nullable=True)
     subject_id = db.Column(db.Integer, db.ForeignKey("subjects.id"), nullable=False, index=True)
     theme_id = db.Column(db.Integer, db.ForeignKey("themes.id"), nullable=True, index=True)
     question_type = db.Column(db.String(50), nullable=False)  # 'choice', 'number', 'text', 'multiple'
     options = db.Column(db.JSON, nullable=True)  # For 'choice' type: ["A) вариант1", "B) вариант2", ...]
     answer = db.Column(db.String(500), nullable=False)  # Correct answer
     explanation = db.Column(db.Text, nullable=True)  # Explanation for correct answer
+    solution_html = db.Column(db.Text, nullable=True)
     difficulty = db.Column(db.Integer, nullable=True)  # 1-5 scale
     source = db.Column(db.String(50), nullable=False, default="neofamily")  # 'neofamily', 'internal'
-    external_id = db.Column(db.String(100), nullable=True)  # ID from external API
+    external_id = db.Column(db.String(100), nullable=True, unique=True, index=True)  # ID from external API
     created_at = db.Column(db.DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
     updated_at = db.Column(db.DateTime, nullable=False, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
 
@@ -111,16 +127,58 @@ class Question(db.Model):
         result = {
             "id": self.id,
             "text": self.text,
+            "html_text": self.html_text,
             "subject_id": self.subject_id,
             "theme_id": self.theme_id,
             "type": self.question_type,
             "options": self.options,
             "difficulty": self.difficulty,
+            "external_id": self.external_id,
         }
         if include_answer:
             result["answer"] = self.answer
             result["explanation"] = self.explanation
+            result["solution_html"] = self.solution_html
         return result
+
+
+class Banner(db.Model):
+    """Task-bank banner metadata from NeoFamily."""
+    __tablename__ = "banners"
+
+    id = db.Column(db.Integer, primary_key=True)
+    subject_id = db.Column(db.Integer, db.ForeignKey("subjects.id"), nullable=False, index=True)
+    external_id = db.Column(db.Integer, nullable=False, unique=True, index=True)
+    name = db.Column(db.String(255), nullable=True)
+    header = db.Column(db.String(500), nullable=True)
+    url = db.Column(db.String(1000), nullable=True)
+    display_order = db.Column(db.Integer, nullable=True)
+    duration = db.Column(db.Integer, nullable=True)
+    open_in_current_tab = db.Column(db.Boolean, nullable=False, default=False)
+    position_name = db.Column(db.String(100), nullable=True)
+    desktop_image_url = db.Column(db.String(1500), nullable=True)
+    mobile_image_url = db.Column(db.String(1500), nullable=True)
+    raw_payload = db.Column(db.JSON, nullable=True)
+    created_at = db.Column(db.DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
+    updated_at = db.Column(db.DateTime, nullable=False, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+
+    subject = db.relationship("Subject", back_populates="banners")
+
+    def to_dict(self) -> dict:
+        return {
+            "id": self.id,
+            "subject_id": self.subject_id,
+            "external_id": self.external_id,
+            "name": self.name,
+            "header": self.header,
+            "url": self.url,
+            "order": self.display_order,
+            "duration": self.duration,
+            "open_in_current_tab": self.open_in_current_tab,
+            "position_name": self.position_name,
+            "desktop_image_url": self.desktop_image_url,
+            "mobile_image_url": self.mobile_image_url,
+        }
 
 
 class UserStat(db.Model):
@@ -146,9 +204,11 @@ class UserStat(db.Model):
 
     def get_progress(self) -> float:
         """Get progress as percentage."""
-        if self.total_answers == 0:
+        total_answers = self.total_answers or 0
+        correct_answers = self.correct_answers or 0
+        if total_answers == 0:
             return 0.0
-        return (self.correct_answers / self.total_answers) * 100
+        return (correct_answers / total_answers) * 100
 
     def to_dict(self) -> dict:
         return {
@@ -156,8 +216,8 @@ class UserStat(db.Model):
             "user_id": self.user_id,
             "subject_id": self.subject_id,
             "theme_id": self.theme_id,
-            "total_answers": self.total_answers,
-            "correct_answers": self.correct_answers,
+            "total_answers": self.total_answers or 0,
+            "correct_answers": self.correct_answers or 0,
             "progress": self.get_progress(),
             "last_updated": self.last_updated.isoformat(),
         }

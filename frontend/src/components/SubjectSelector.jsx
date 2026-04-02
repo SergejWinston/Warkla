@@ -10,11 +10,14 @@ export default function SubjectSelector({ onSelect }) {
     setSelectedSubject(subject.id)
   }
 
-  const handleThemeSelect = (theme) => {
-    if (selectedSubject && theme) {
+  const handleThemeSelect = (theme = null) => {
+    const subject = subjects.find((item) => item.id === selectedSubject)
+    if (subject) {
       onSelect({
         subjectId: selectedSubject,
-        themeId: theme.id,
+        subjectSlug: subject.slug,
+        subjectName: subject.name,
+        themeId: theme?.id || null,
       })
     }
   }
@@ -36,11 +39,12 @@ export default function SubjectSelector({ onSelect }) {
             <button
               key={subject.id}
               onClick={() => handleSubjectSelect(subject)}
-              className={`p-4 rounded-lg font-medium transition ${
+              className={`p-4 rounded-lg font-medium transition border ${
                 selectedSubject === subject.id
-                  ? 'bg-blue-500 text-white'
-                  : 'bg-gray-100 text-gray-900 hover:bg-gray-200'
+                  ? 'bg-blue-500 text-white border-blue-500'
+                  : 'bg-gray-100 text-gray-900 border-gray-200 hover:bg-gray-200'
               }`}
+              style={subject.color ? { borderColor: subject.color } : undefined}
             >
               {subject.name}
             </button>
@@ -50,7 +54,15 @@ export default function SubjectSelector({ onSelect }) {
 
       {selectedSubject && (
         <div>
-          <h2 className="text-2xl font-bold mb-4 text-gray-900">Выбери тему</h2>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-2xl font-bold text-gray-900">Выбери тему</h2>
+            <button
+              onClick={() => handleThemeSelect(null)}
+              className="text-sm px-3 py-2 rounded-md bg-blue-50 text-blue-700 hover:bg-blue-100 transition"
+            >
+              Все задания предмета
+            </button>
+          </div>
           {themesLoading ? (
             <div className="text-center text-gray-600">Загрузка тем...</div>
           ) : (

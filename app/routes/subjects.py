@@ -1,16 +1,16 @@
 from flask import Blueprint, jsonify
-from flask_jwt_extended import jwt_required, get_jwt_identity
+from flask_jwt_extended import get_jwt_identity, jwt_required
 
-from app.extensions import db
-from app.models import Subject, Theme, UserStat
+from app.models import Banner, Subject, Theme, UserStat
+from app.services.question_loader import NeoFamilyQuestionLoader
 
 subjects_bp = Blueprint("subjects", __name__, url_prefix="/api/subjects")
 
 
 @subjects_bp.get("")
 def get_subjects():
-    """Get all subjects."""
-    subjects = Subject.query.all()
+    """Get all active subjects available in task-bank."""
+    subjects = Subject.query.filter_by(is_active=True).order_by(Subject.name.asc()).all()
     return jsonify([s.to_dict() for s in subjects])
 
 
@@ -18,6 +18,15 @@ def get_subjects():
 def get_subject(subject_id: int):
     """Get subject by ID."""
     subject = Subject.query.get(subject_id)
+    if not subject:
+        return jsonify({"error": "Subject not found"}), 404
+    return jsonify(subject.to_dict())
+
+
+@subjects_bp.get("/by-slug/<string:subject_slug>")
+def get_subject_by_slug(subject_slug: str):
+    """Get subject by slug."""
+    subject = Subject.query.filter_by(slug=subject_slug).first()
     if not subject:
         return jsonify({"error": "Subject not found"}), 404
     return jsonify(subject.to_dict())
@@ -32,6 +41,27 @@ def get_subject_themes(subject_id: int):
 
     themes = Theme.query.filter_by(subject_id=subject_id).all()
     return jsonify([t.to_dict() for t in themes])
+
+
+@subjects_bp.get("/<string:subject_slug>/banner")
+def get_subject_banner(subject_slug: str):
+    """Get latest banner for a subject by slug."""
+    subject = Subject.query.filter_by(slug=subject_slug).first()
+    if not subject:
+        return jsonify({"error": "Subject not found"}), 404
+
+    banner = Banner.query.filter_by(subject_id=subject.id).order_by(Banner.updated_at.desc(), Banner.id.desc()).first()
+    if not banner:
+        return jsonify({"data": None}), 200
+
+    return jsonify({"data": banner.to_dict()})
+
+
+@subjects_bp.post("/sync")
+def sync_subjects():
+    """Trigger manual NeoFamily sync cycle."""
+    summary = NeoFamilyQuestionLoader.bootstrap_sync(max_pages=2, per_page=15)
+    return jsonify({"status": "ok", "summary": summary})
 
 
 @subjects_bp.get("/<int:subject_id>/progress")

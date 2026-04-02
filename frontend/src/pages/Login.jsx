@@ -44,13 +44,14 @@ export default function Login() {
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Имя пользователя
+              Имя пользователя или Email
             </label>
             <input
               type="text"
               name="username"
               value={formData.username}
               onChange={handleChange}
+              placeholder="Например: Xegerol или user@example.com"
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
               required
             />

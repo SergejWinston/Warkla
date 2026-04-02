@@ -20,7 +20,19 @@ def _ensure_sqlite_schema_compatibility() -> None:
 
     required_columns: dict[str, dict[str, str]] = {
         "users": {"updated_at": "DATETIME"},
-        "questions": {"updated_at": "DATETIME"},
+        "subjects": {
+            "color": "VARCHAR(32)",
+            "external_id": "INTEGER",
+            "is_active": "BOOLEAN DEFAULT 1",
+            "synced_at": "DATETIME",
+        },
+        "themes": {"external_id": "INTEGER"},
+        "questions": {
+            "updated_at": "DATETIME",
+            "html_text": "TEXT",
+            "solution_html": "TEXT",
+            "external_id": "VARCHAR(64)",
+        },
     }
 
     for table_name, columns in required_columns.items():
@@ -37,6 +49,36 @@ def _ensure_sqlite_schema_compatibility() -> None:
                     f"ALTER TABLE {table_name} ADD COLUMN {column_name} {column_type}"
                 )
             )
+
+    if "banners" not in inspector.get_table_names():
+        db.session.execute(
+            text(
+                """
+                CREATE TABLE banners (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    subject_id INTEGER NOT NULL,
+                    external_id INTEGER NOT NULL UNIQUE,
+                    name VARCHAR(255),
+                    header VARCHAR(255),
+                    url VARCHAR(500),
+                    display_order INTEGER,
+                    duration INTEGER,
+                    open_in_current_tab BOOLEAN DEFAULT 0,
+                    position_name VARCHAR(128),
+                    desktop_image_url VARCHAR(500),
+                    mobile_image_url VARCHAR(500),
+                    raw_payload TEXT,
+                    created_at DATETIME,
+                    updated_at DATETIME,
+                    FOREIGN KEY(subject_id) REFERENCES subjects(id) ON DELETE CASCADE
+                )
+                """
+            )
+        )
+
+    db.session.execute(text("CREATE INDEX IF NOT EXISTS idx_subject_external_id ON subjects(external_id)"))
+    db.session.execute(text("CREATE INDEX IF NOT EXISTS idx_theme_subject_external_id ON themes(subject_id, external_id)"))
+    db.session.execute(text("CREATE INDEX IF NOT EXISTS idx_question_external_id ON questions(external_id)"))
 
     db.session.commit()
 
@@ -74,8 +116,9 @@ def create_app(config_name: str | None = None) -> Flask:
     with app.app_context():
         db.create_all()
         _ensure_sqlite_schema_compatibility()
-        from app.services import seed_subjects
+        from app.services import seed_subjects, start_background_sync
         seed_subjects()
+        start_background_sync(app)
 
     # Global error handlers
     @app.errorhandler(400)

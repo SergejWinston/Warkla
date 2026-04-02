@@ -7,9 +7,17 @@ from app import create_app
 app = create_app()
 
 
+def _env_bool(name: str, default: bool = False) -> bool:
+    value = os.getenv(name)
+    if value is None:
+        return default
+    return value.strip().lower() in {"1", "true", "yes", "on"}
+
+
 def run_flask():
     """Run Flask application."""
-    app.run(host="0.0.0.0", port=5000, debug=os.getenv("FLASK_ENV") == "development")
+    debug = _env_bool("FLASK_DEBUG", default=os.getenv("FLASK_ENV") == "development")
+    app.run(host="0.0.0.0", port=5000, debug=debug)
 
 
 def run_bot():

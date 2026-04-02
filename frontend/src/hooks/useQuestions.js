@@ -2,22 +2,71 @@ import { useState, useCallback } from 'react'
 import { questionsAPI, answersAPI } from '../lib/api'
 
 export const useQuestion = () => {
-  const [question, setQuestion] = useState(null)
+  const [questions, setQuestions] = useState([])
+  const [currentIndex, setCurrentIndex] = useState(0)
+  const [pagination, setPagination] = useState(null)
+  const [session, setSession] = useState(null)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState(null)
 
-  const getRandom = useCallback(async (subjectId, themeId) => {
+  const loadPage = useCallback(async ({ subjectSlug, themeId = null, page = 1, perPage = 15 }) => {
     setIsLoading(true)
     setError(null)
     try {
-      const { data } = await questionsAPI.getRandom(subjectId, themeId)
-      setQuestion(data)
-      return data
+      const { data } = await questionsAPI.getPage({ subjectSlug, themeId, page, perPage })
+      const pageItems = Array.isArray(data?.data) ? data.data : []
+
+      setQuestions(pageItems)
+      setCurrentIndex(0)
+      setPagination(data?.pagination || null)
+      setSession({ subjectSlug, themeId, page, perPage })
+
+      return pageItems[0] || null
     } catch (err) {
-      setError(err.response?.data?.error || 'Failed to fetch question')
+      setError(err.response?.data?.error || 'Failed to fetch questions')
+      setQuestions([])
+      setCurrentIndex(0)
+      setPagination(null)
+      return null
     } finally {
       setIsLoading(false)
     }
+  }, [])
+
+  const startSession = useCallback(async ({ subjectSlug, themeId = null, perPage = 15 }) => {
+    return loadPage({ subjectSlug, themeId, page: 1, perPage })
+  }, [loadPage])
+
+  const nextQuestion = useCallback(async () => {
+    if (currentIndex + 1 < questions.length) {
+      setCurrentIndex((prev) => prev + 1)
+      return questions[currentIndex + 1]
+    }
+
+    if (!session || !pagination) {
+      return null
+    }
+
+    const currentPage = pagination.currentPage || session.page || 1
+    const totalPages = pagination.totalPages || 0
+    if (currentPage >= totalPages) {
+      return null
+    }
+
+    return loadPage({
+      subjectSlug: session.subjectSlug,
+      themeId: session.themeId,
+      page: currentPage + 1,
+      perPage: session.perPage,
+    })
+  }, [currentIndex, loadPage, pagination, questions, session])
+
+  const resetSession = useCallback(() => {
+    setQuestions([])
+    setCurrentIndex(0)
+    setPagination(null)
+    setSession(null)
+    setError(null)
   }, [])
 
   const getById = useCallback(async (questionId) => {
@@ -25,10 +74,12 @@ export const useQuestion = () => {
     setError(null)
     try {
       const { data } = await questionsAPI.getById(questionId)
-      setQuestion(data)
+      setQuestions(data ? [data] : [])
+      setCurrentIndex(0)
       return data
     } catch (err) {
       setError(err.response?.data?.error || 'Failed to fetch question')
+      return null
     } finally {
       setIsLoading(false)
     }
@@ -43,7 +94,20 @@ export const useQuestion = () => {
     }
   }, [])
 
-  return { question, isLoading, error, getRandom, getById, getSolution }
+  const question = questions[currentIndex] || null
+
+  return {
+    question,
+    isLoading,
+    error,
+    pagination,
+    startSession,
+    nextQuestion,
+    resetSession,
+    loadPage,
+    getById,
+    getSolution,
+  }
 }
 
 export const useAnswerSubmit = () => {

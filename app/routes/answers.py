@@ -3,6 +3,7 @@ from flask_jwt_extended import jwt_required, get_jwt_identity
 
 from app.extensions import db
 from app.models import Question, UserAnswer, UserStat
+from app.services.question_loader import NeoFamilyQuestionLoader
 
 answers_bp = Blueprint("answers", __name__, url_prefix="/api/answers")
 
@@ -40,6 +41,20 @@ def check_answer(question: Question, user_answer: str) -> bool:
         return False
 
 
+def check_answer_with_source(question: Question, user_answer: str) -> bool:
+    """Check answer using source-specific strategy."""
+    if (
+        question.source == "neofamily"
+        and question.external_id
+        and question.answer == NeoFamilyQuestionLoader.REMOTE_CHECK_PLACEHOLDER
+    ):
+        remote_result = NeoFamilyQuestionLoader.check_task_answer(question.external_id, user_answer)
+        if remote_result is not None:
+            return remote_result
+
+    return check_answer(question, user_answer)
+
+
 @answers_bp.post("")
 @jwt_required()
 def submit_answer():
@@ -58,8 +73,13 @@ def submit_answer():
     if not question:
         return jsonify({"error": "Question not found"}), 404
 
-    # Check answer
-    is_correct = check_answer(question, user_answer)
+    # Check answer (remote NeoFamily validation where applicable)
+    is_correct = check_answer_with_source(question, user_answer)
+
+    if question.source == "neofamily" and question.external_id and not question.solution_html:
+        solution_html = NeoFamilyQuestionLoader.fetch_solution(question.external_id)
+        if solution_html:
+            question.solution_html = solution_html
 
     # Save user's answer
     answer_record = UserAnswer(
@@ -82,10 +102,15 @@ def submit_answer():
         overall_stat = UserStat(
             user_id=user_id,
             subject_id=question.subject_id,
-            theme_id=None
+            theme_id=None,
+            total_answers=0,
+            correct_answers=0,
         )
         db.session.add(overall_stat)
 
+    # Normalize possible legacy NULL values before arithmetic updates.
+    overall_stat.total_answers = overall_stat.total_answers or 0
+    overall_stat.correct_answers = overall_stat.correct_answers or 0
     overall_stat.total_answers += 1
     if is_correct:
         overall_stat.correct_answers += 1
@@ -102,23 +127,38 @@ def submit_answer():
             theme_stat = UserStat(
                 user_id=user_id,
                 subject_id=question.subject_id,
-                theme_id=question.theme_id
+                theme_id=question.theme_id,
+                total_answers=0,
+                correct_answers=0,
             )
             db.session.add(theme_stat)
 
+        # Normalize possible legacy NULL values before arithmetic updates.
+        theme_stat.total_answers = theme_stat.total_answers or 0
+        theme_stat.correct_answers = theme_stat.correct_answers or 0
         theme_stat.total_answers += 1
         if is_correct:
             theme_stat.correct_answers += 1
 
     db.session.commit()
 
-    return jsonify({
-        "is_correct": is_correct,
-        "correct_answer": question.answer,
-        "explanation": question.explanation,
-        "user_answer": user_answer,
-        "question_id": question_id
-    })
+    correct_answer = question.answer
+    if (
+        question.source == "neofamily"
+        and question.answer == NeoFamilyQuestionLoader.REMOTE_CHECK_PLACEHOLDER
+    ):
+        correct_answer = None
+
+    return jsonify(
+        {
+            "is_correct": is_correct,
+            "correct_answer": correct_answer,
+            "explanation": question.explanation,
+            "solution_html": question.solution_html,
+            "user_answer": user_answer,
+            "question_id": question_id,
+        }
+    )
 
 
 @answers_bp.get("/history")

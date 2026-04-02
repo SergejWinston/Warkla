@@ -1,5 +1,6 @@
 from flask import Blueprint, jsonify, request
 from flask_jwt_extended import create_access_token, jwt_required, get_jwt_identity
+from sqlalchemy import or_, func
 
 from app.extensions import db
 from app.models import User
@@ -44,13 +45,24 @@ def register():
 def login():
     data = request.get_json(silent=True) or {}
 
-    email = (data.get("email") or "").strip().lower()
+    login_value = (
+        (data.get("login") or "").strip()
+        or (data.get("username") or "").strip()
+        or (data.get("email") or "").strip()
+    )
     password = data.get("password") or ""
 
-    if not email or not password:
-        return jsonify({"error": "email and password are required"}), 400
+    if not login_value or not password:
+        return jsonify({"error": "username/email and password are required"}), 400
 
-    user = User.query.filter_by(email=email).first()
+    login_normalized = login_value.lower()
+    user = User.query.filter(
+        or_(
+            func.lower(User.email) == login_normalized,
+            func.lower(User.username) == login_normalized,
+        )
+    ).first()
+
     if not user or not user.check_password(password):
         return jsonify({"error": "Invalid credentials"}), 401
 
