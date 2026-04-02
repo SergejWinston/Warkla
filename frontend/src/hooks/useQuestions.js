@@ -9,17 +9,24 @@ export const useQuestion = () => {
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState(null)
 
-  const loadPage = useCallback(async ({ subjectSlug, themeId = null, page = 1, perPage = 15 }) => {
+  const loadPage = useCallback(async ({ subjectSlug, themeId = null, page = 1, perPage = 15, sortBy = 'id', sortOrder = 'asc' }) => {
     setIsLoading(true)
     setError(null)
     try {
-      const { data } = await questionsAPI.getPage({ subjectSlug, themeId, page, perPage })
+      const { data } = await questionsAPI.getPage({
+        subjectSlug,
+        themeId,
+        page,
+        perPage,
+        sortBy,
+        sortOrder,
+      })
       const pageItems = Array.isArray(data?.data) ? data.data : []
 
       setQuestions(pageItems)
       setCurrentIndex(0)
       setPagination(data?.pagination || null)
-      setSession({ subjectSlug, themeId, page, perPage })
+      setSession({ subjectSlug, themeId, page, perPage, sortBy, sortOrder })
 
       return pageItems[0] || null
     } catch (err) {
@@ -33,8 +40,8 @@ export const useQuestion = () => {
     }
   }, [])
 
-  const startSession = useCallback(async ({ subjectSlug, themeId = null, perPage = 15 }) => {
-    return loadPage({ subjectSlug, themeId, page: 1, perPage })
+  const startSession = useCallback(async ({ subjectSlug, themeId = null, perPage = 15, sortBy = 'id', sortOrder = 'asc' }) => {
+    return loadPage({ subjectSlug, themeId, page: 1, perPage, sortBy, sortOrder })
   }, [loadPage])
 
   const nextQuestion = useCallback(async () => {
@@ -58,6 +65,8 @@ export const useQuestion = () => {
       themeId: session.themeId,
       page: currentPage + 1,
       perPage: session.perPage,
+      sortBy: session.sortBy,
+      sortOrder: session.sortOrder,
     })
   }, [currentIndex, loadPage, pagination, questions, session])
 
@@ -97,6 +106,7 @@ export const useQuestion = () => {
   const question = questions[currentIndex] || null
 
   return {
+    questions,
     question,
     isLoading,
     error,

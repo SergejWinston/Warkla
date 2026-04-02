@@ -8,6 +8,7 @@ from typing import Optional, Dict, Any
 
 import requests
 from flask import current_app
+from sqlalchemy import asc, desc
 
 from app.extensions import db
 from app.models import Banner, Question, Subject, Theme
@@ -404,8 +405,21 @@ class NeoFamilyQuestionLoader:
         page: int = 1,
         per_page: int = 15,
         theme_id: Optional[int] = None,
+        sort_params: Optional[list[tuple[str, str]]] = None,
     ) -> Dict[str, Any]:
-        """Fetch paginated questions from local database for API responses."""
+        """
+        Fetch paginated questions from local database for API responses.
+        
+        Args:
+            subject_slug: Slug of the subject (e.g., 'russkiy-yazyk')
+            page: Page number (1-indexed)
+            per_page: Items per page (max 100)
+            theme_id: Optional theme ID filter
+            sort_params: List of (field, order) tuples, e.g., [('id', 'asc'), ('difficulty', 'desc')]
+        
+        Returns:
+            Dictionary with 'data' and 'pagination' keys
+        """
         page = max(page, 1)
         per_page = max(min(per_page, 100), 1)
 
@@ -426,8 +440,33 @@ class NeoFamilyQuestionLoader:
         if theme_id is not None:
             query = query.filter_by(theme_id=theme_id)
 
+        # Define allowed sortable columns and their mappings
+        allowed_sort_columns = {
+            "id": Question.id,
+            "created_at": Question.created_at,
+            "updated_at": Question.updated_at,
+            "difficulty": Question.difficulty,
+            "external_id": Question.external_id,
+            "theme_id": Question.theme_id,
+            "question_type": Question.question_type,
+        }
+        
+        # Build sorting expressions from sort_params
+        sort_params = sort_params or [("id", "asc")]
+        sort_expressions = []
+        
+        for field, order in sort_params:
+            sort_column = allowed_sort_columns.get(field.lower())
+            if sort_column is not None:
+                sort_expr = desc(sort_column) if order == "desc" else asc(sort_column)
+                sort_expressions.append(sort_expr)
+        
+        # Always add ID as final sort key for consistency
+        if not any(field.lower() == "id" for field, _ in sort_params):
+            sort_expressions.append(asc(Question.id))
+
         total = query.count()
-        items = query.order_by(Question.id.asc()).offset((page - 1) * per_page).limit(per_page).all()
+        items = query.order_by(*sort_expressions).offset((page - 1) * per_page).limit(per_page).all()
         total_pages = (total + per_page - 1) // per_page if total else 0
 
         return {

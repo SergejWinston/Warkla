@@ -6,6 +6,7 @@ Telegram-бот + веб-приложение для подготовки шко
 
 - **Выбор предмета и темы** - Пользователь выбирает предмет (русский язык, математика, информатика, обществознание)
 - **Генерация вопросов** - База готовых вопросов (загружается из NeoFamily API с кешированием)
+- **Продвинутая сортировка** ⭐ - Множественная сортировка по различным полям (ID, сложность, дата и др.)
 - **Разные типы вопросов** - выбор ответа, ввод числа, краткий текстовый ответ, множественный выбор
 - **Проверка ответов** - Автоматическая проверка правильности с объяснением ошибок
 - **Статистика и прогресс** - Процент правильных ответов по предметам и темам, визуализация графиков
@@ -101,7 +102,14 @@ python run.py all  # или просто python run.py
 - `GET /api/subjects/<id>/progress` - Прогресс (protected)
 
 ### Questions
-- `GET /api/questions?subject=<id>&theme=<id>` - Получить вопрос (protected)
+- `GET /api/questions?subject_slug=<slug>&theme_id=<id>` - Получить вопросы (protected)
+  - **Поддержка сортировки**: `sort[field]=order` (множественные параметры)
+  - Примеры:
+    - `?subject_slug=russkiy-yazyk&sort[id]=asc` - по ID
+    - `?subject_slug=russkiy-yazyk&sort[difficulty]=desc&sort[id]=asc` - по сложности и ID
+    - `?subject_slug=russkiy-yazyk&theme_id=43&sort[created_at]=desc` - с фильтром
+  - Доступные поля: `id`, `created_at`, `updated_at`, `difficulty`, `external_id`, `theme_id`, `question_type`
+  - 📘 [Подробная документация по сортировке](SORTING.md)
 - `GET /api/questions/<id>/solution` - Вопрос с ответом (protected)
 
 ### Answers

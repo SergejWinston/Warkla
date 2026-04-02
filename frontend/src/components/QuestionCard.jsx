@@ -47,9 +47,9 @@ export default function QuestionCard({ question, onSubmit, isLoading }) {
     if (!question) return
 
     if ((question.type === 'choice' || question.type === 'multiple') && options.length > 0) {
-      onSubmit(selectedOption)
+      onSubmit(question.id, selectedOption)
     } else {
-      onSubmit(answer.trim())
+      onSubmit(question.id, answer.trim())
     }
   }
 

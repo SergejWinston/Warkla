@@ -46,13 +46,15 @@ export const subjectsAPI = {
 }
 
 export const questionsAPI = {
-  getPage: ({ subjectSlug, themeId, page = 1, perPage = 15 }) =>
+  getPage: ({ subjectSlug, themeId, page = 1, perPage = 15, sortBy = 'id', sortOrder = 'asc' }) =>
     api.get('/questions', {
       params: {
         subject_slug: subjectSlug,
         theme_id: themeId,
         page,
         per_page: perPage,
+        sort_by: sortBy,
+        sort_order: sortOrder,
       },
     }),
   getById: (questionId) => api.get(`/questions/${questionId}`),

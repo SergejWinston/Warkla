@@ -1,6 +1,11 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
-import { Login, Dashboard, Quiz, Stats, History, Leaderboard } from './pages'
 import { ProtectedRoute } from './components'
+import Login from './pages/Login'
+import Dashboard from './pages/Dashboard'
+import Stats from './pages/Stats'
+import History from './pages/History'
+import Leaderboard from './pages/Leaderboard'
+import TaskBank from './pages/TaskBank'
 
 function App() {
   return (
@@ -13,15 +18,6 @@ function App() {
           element={
             <ProtectedRoute>
               <Dashboard />
-            </ProtectedRoute>
-          }
-        />
-
-        <Route
-          path="/quiz"
-          element={
-            <ProtectedRoute>
-              <Quiz />
             </ProtectedRoute>
           }
         />
@@ -49,6 +45,15 @@ function App() {
           element={
             <ProtectedRoute>
               <Leaderboard />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/task-bank"
+          element={
+            <ProtectedRoute>
+              <TaskBank />
             </ProtectedRoute>
           }
         />

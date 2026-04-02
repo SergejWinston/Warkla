@@ -1,12 +1,49 @@
+from typing import Dict, List, Tuple
 from flask import Blueprint, jsonify, request
 from flask_jwt_extended import jwt_required
 from sqlalchemy import func
+from werkzeug.datastructures import ImmutableMultiDict
 
 from app.extensions import db
 from app.models import Question, Subject
 from app.services.question_loader import NeoFamilyQuestionLoader
 
 questions_bp = Blueprint("questions", __name__, url_prefix="/api/questions")
+
+
+def _parse_sort_params(args: ImmutableMultiDict) -> List[Tuple[str, str]]:
+    """
+    Parse sorting parameters from request arguments.
+    
+    Supports multiple formats:
+    1. sort[field]=order (NeoFamily API style, multiple allowed)
+    2. sort_by=field + sort_order=order (legacy style)
+    
+    Returns:
+        List of (field, order) tuples, e.g., [('id', 'asc'), ('difficulty', 'desc')]
+    """
+    sort_params: List[Tuple[str, str]] = []
+    
+    # Parse sort[field]=order format (multiple parameters allowed)
+    for key in args.keys():
+        if key.startswith("sort[") and key.endswith("]"):
+            field = key[5:-1]  # Extract field name from sort[field]
+            order = args.get(key, "asc").lower()
+            if order in ("asc", "desc"):
+                sort_params.append((field, order))
+    
+    # Fallback to legacy sort_by + sort_order format if no sort[...] params found
+    if not sort_params:
+        sort_by = args.get("sort_by", "id")
+        sort_order = args.get("sort_order", "asc").lower()
+        if sort_order in ("asc", "desc"):
+            sort_params.append((sort_by, sort_order))
+    
+    # Default to sorting by ID if no valid params provided
+    if not sort_params:
+        sort_params.append(("id", "asc"))
+    
+    return sort_params
 
 
 @questions_bp.get("")
@@ -18,6 +55,10 @@ def get_question():
     page = request.args.get("page", default=1, type=int)
     per_page = request.args.get("per_page", default=15, type=int)
     theme_id = request.args.get("theme_id", default=None, type=int)
+    
+    # Parse sorting parameters from request
+    # Supports formats: sort[field]=order, sort_by=field + sort_order=order
+    sort_params = _parse_sort_params(request.args)
 
     if not subject_slug and subject_id:
         subject = Subject.query.get(subject_id)
@@ -31,6 +72,7 @@ def get_question():
         page=page,
         per_page=per_page,
         theme_id=theme_id,
+        sort_params=sort_params,
     )
 
     if not result["data"]:
@@ -40,6 +82,7 @@ def get_question():
             page=page,
             per_page=per_page,
             theme_id=theme_id,
+            sort_params=sort_params,
         )
 
     return jsonify(result)
