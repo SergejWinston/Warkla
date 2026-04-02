@@ -1,5 +1,6 @@
 import { useNavigate } from 'react-router-dom'
 import { useSubjects } from '../hooks'
+import Layout from '../components/Layout'
 
 const withAlpha = (color, alphaSuffix) => {
   if (typeof color !== 'string') return null
@@ -10,8 +11,8 @@ const withAlpha = (color, alphaSuffix) => {
 }
 
 const getCardStyle = (color) => ({
-  borderColor: color || '#cbd5e1',
-  backgroundColor: withAlpha(color, '1A') || '#f8fafc',
+  borderColor: color || '#2d1b4e',
+  backgroundColor: withAlpha(color, '1A') || '#FFF8F0',
 })
 
 export default function TaskBank() {
@@ -19,70 +20,84 @@ export default function TaskBank() {
   const { subjects, isLoading, error, refetch } = useSubjects()
 
   return (
-    <div className="min-h-screen bg-slate-50 p-6">
-      <div className="max-w-6xl mx-auto space-y-6">
-        <div className="flex flex-wrap items-start justify-between gap-4">
+    <Layout>
+      <div className="max-w-6xl mx-auto space-y-8">
+        <div className="flex flex-wrap items-start justify-between gap-4 animate-slide-down">
           <div>
             <button
               onClick={() => navigate('/dashboard')}
-              className="text-sky-600 hover:text-sky-700 font-medium mb-3"
+              className="px-4 py-2 bg-pixel-purple hover:bg-pixel-purple-dark border-4 border-pixel-dark shadow-pixel hover:shadow-pixel-hover font-cute font-bold text-pixel-dark transition-all duration-100 transform hover:translate-x-1 hover:translate-y-1 mb-6 flex items-center gap-2"
             >
-              ← Назад к разделам
+              <span>←</span>
+              Назад к разделам
             </button>
-            <h1 className="text-3xl font-bold text-slate-900">Банк заданий</h1>
-            <p className="text-slate-600 mt-2">Каталог доступных предметов. Для решения открой раздел предметов на главной странице.</p>
+            <h1 className="font-cute text-4xl font-bold text-pixel-dark flex items-center gap-3">
+              <span className="text-5xl">🗂️</span>
+              Банк заданий
+            </h1>
+            <p className="font-main text-pixel-dark/70 mt-3">Каталог доступных предметов. Для решения открой раздел предметов на главной странице.</p>
           </div>
           <button
             onClick={() => navigate('/dashboard')}
-            className="px-4 py-2 rounded-lg bg-sky-600 text-white hover:bg-sky-700 transition"
+            className="px-5 py-3 bg-pixel-pink hover:bg-pixel-pink-dark border-4 border-pixel-dark shadow-pixel hover:shadow-pixel-hover font-cute font-bold text-pixel-dark transition-all duration-100 transform hover:translate-x-1 hover:translate-y-1"
           >
-            Перейти к предметам
+            Перейти к предметам 🚀
           </button>
         </div>
 
         {isLoading && (
-          <div className="rounded-xl border border-slate-200 bg-white p-6 text-slate-600">Загрузка предметов...</div>
+          <div className="bg-pixel-cream border-4 border-pixel-dark p-10 text-center animate-bounce-slow">
+            <div className="text-5xl mb-4 animate-spin">⏳</div>
+            <div className="font-cute text-xl text-pixel-dark">Загрузка предметов...</div>
+          </div>
         )}
 
         {!isLoading && error && (
-          <div className="rounded-xl border border-rose-200 bg-rose-50 p-6">
-            <p className="text-rose-700 mb-4">Не удалось загрузить список предметов.</p>
+          <div className="bg-pixel-red/20 border-4 border-pixel-red-dark p-8 animate-wiggle">
+            <p className="font-main font-semibold text-pixel-red-dark mb-5 flex items-center gap-2">
+              <span className="text-2xl">⚠️</span>
+              Не удалось загрузить список предметов.
+            </p>
             <button
               onClick={refetch}
-              className="px-4 py-2 rounded-lg bg-rose-500 text-white hover:bg-rose-600 transition"
+              className="px-5 py-3 bg-pixel-red-dark hover:bg-pixel-red border-4 border-pixel-dark shadow-pixel hover:shadow-pixel-hover font-cute font-bold text-white transition-all duration-100 transform hover:translate-x-1 hover:translate-y-1"
             >
-              Повторить
+              Повторить 🔄
             </button>
           </div>
         )}
 
         {!isLoading && !error && subjects.length === 0 && (
-          <div className="rounded-xl border border-slate-200 bg-white p-6 text-slate-600">
-            Предметы пока не найдены.
+          <div className="bg-pixel-cream border-4 border-pixel-dark p-10 text-center">
+            <div className="text-6xl mb-4 animate-bounce-slow">📚</div>
+            <p className="font-cute text-xl text-pixel-dark">Предметы пока не найдены.</p>
           </div>
         )}
 
         {!isLoading && !error && subjects.length > 0 && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 animate-fade-in">
             {subjects.map((subject) => (
               <div
                 key={subject.id}
-                className="rounded-xl border p-5"
+                className="bg-white border-4 border-pixel-dark shadow-pixel hover:shadow-pixel-hover p-6 transform hover:translate-x-1 hover:translate-y-1 transition-all duration-100"
                 style={getCardStyle(subject.color)}
               >
-                <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Предмет</p>
-                <h3 className="text-xl font-bold text-slate-900 mt-2">{subject.name}</h3>
+                <div className="flex items-center gap-3 mb-3">
+                  <span className="text-3xl">📖</span>
+                  <p className="text-xs font-main uppercase tracking-wider text-pixel-dark/60">Предмет</p>
+                </div>
+                <h3 className="font-cute text-xl font-bold text-pixel-dark mb-4">{subject.name}</h3>
                 <button
                   onClick={() => navigate('/dashboard')}
-                  className="mt-4 text-sm font-semibold text-sky-700 hover:text-sky-800"
+                  className="px-4 py-2 bg-pixel-blue hover:bg-pixel-blue-dark border-3 border-pixel-dark shadow-pixel-sm hover:shadow-pixel font-main font-bold text-sm text-pixel-dark transition-all duration-100 transform hover:translate-x-0.5 hover:translate-y-0.5"
                 >
-                  Открыть в разделе предметов
+                  Открыть в разделе предметов →
                 </button>
               </div>
             ))}
           </div>
         )}
       </div>
-    </div>
+    </Layout>
   )
 }

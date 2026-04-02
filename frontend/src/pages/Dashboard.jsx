@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { QuestionCard, SubjectBanner } from '../components'
+import { QuestionCard, SubjectBanner, Layout } from '../components'
 import {
   useAnswerSubmit,
   useAuth,
@@ -222,62 +222,61 @@ export default function Dashboard() {
 
   if (!user) {
     return (
-      <div className="flex justify-center items-center min-h-screen bg-slate-50">
-        <div className="text-xl text-slate-600">Загрузка...</div>
-      </div>
+      <Layout>
+        <div className="flex justify-center items-center min-h-[60vh]">
+          <div className="bg-pixel-cream border-6 border-pixel-dark shadow-pixel-lg p-8 animate-bounce-slow">
+            <div className="text-4xl mb-4 text-center animate-spin">⏳</div>
+            <div className="text-xl font-cute text-pixel-dark">Загрузка...</div>
+          </div>
+        </div>
+      </Layout>
     )
   }
 
   return (
-    <div className="min-h-screen bg-slate-50">
-      <header className="bg-white border-b border-slate-200">
-        <div className="max-w-7xl mx-auto px-6 py-4 flex justify-between items-center gap-4">
-          <div>
-            <h1 className="text-2xl font-bold text-slate-900">EGE-Bot</h1>
-            <p className="text-sm text-slate-500">Выбирай предмет и решай задания без лишних шагов</p>
-          </div>
-          <div className="flex items-center gap-4">
-            <span className="text-slate-700">{user.username}</span>
-            <button
-              onClick={handleLogout}
-              className="px-4 py-2 bg-rose-500 text-white rounded-lg hover:bg-rose-600 transition"
-            >
-              Выход
-            </button>
-          </div>
-        </div>
-      </header>
-
-      <main className="max-w-7xl mx-auto px-6 py-8 space-y-8">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6">
-            <div className="text-3xl font-bold text-sky-600 mb-2">{totalAnswers}</div>
-            <p className="text-slate-600">Всего ответов</p>
+    <Layout>
+      <div className="space-y-8">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 animate-slide-up">
+          <div className="bg-pixel-blue border-4 border-pixel-dark shadow-pixel p-6 transform hover:translate-x-1 hover:translate-y-1 transition-all duration-100">
+            <div className="flex items-center gap-3 mb-3">
+              <span className="text-4xl">📊</span>
+              <div className="text-4xl font-cute font-bold text-pixel-dark">{totalAnswers}</div>
+            </div>
+            <p className="font-main font-semibold text-pixel-dark">Всего ответов</p>
           </div>
 
-          <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6">
-            <div className="text-3xl font-bold text-emerald-600 mb-2">{accuracy}%</div>
-            <p className="text-slate-600">Точность</p>
+          <div className="bg-pixel-green border-4 border-pixel-dark shadow-pixel p-6 transform hover:translate-x-1 hover:translate-y-1 transition-all duration-100">
+            <div className="flex items-center gap-3 mb-3">
+              <span className="text-4xl">🎯</span>
+              <div className="text-4xl font-cute font-bold text-pixel-dark">{accuracy}%</div>
+            </div>
+            <p className="font-main font-semibold text-pixel-dark">Точность</p>
           </div>
 
-          <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6">
-            <div className="text-3xl font-bold text-amber-600 mb-2">{streak?.day_streak || 0}</div>
-            <p className="text-slate-600">Дневной стрик</p>
+          <div className="bg-pixel-yellow border-4 border-pixel-dark shadow-pixel p-6 transform hover:translate-x-1 hover:translate-y-1 transition-all duration-100">
+            <div className="flex items-center gap-3 mb-3">
+              <span className="text-4xl animate-heartbeat">🔥</span>
+              <div className="text-4xl font-cute font-bold text-pixel-dark">{streak?.day_streak || 0}</div>
+            </div>
+            <p className="font-main font-semibold text-pixel-dark">Дневной стрик</p>
           </div>
         </div>
 
-        <section className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 md:p-8">
+        <section className="bg-pixel-cream border-6 border-pixel-dark shadow-pixel-lg p-6 md:p-8 animate-fade-in">
           <div className="flex flex-wrap items-start justify-between gap-4 mb-6">
             <div>
-              <h2 className="text-2xl font-bold text-slate-900">Разделы предметов</h2>
-              <p className="text-slate-500 mt-1">Сначала выбери предмет, затем тему и переходи к заданиям.</p>
+              <h2 className="font-cute text-3xl font-bold text-pixel-dark flex items-center gap-3">
+                <span className="text-4xl">📚</span>
+                Разделы предметов
+              </h2>
+              <p className="font-main text-pixel-dark/70 mt-2">Выбери предмет, затем тему и переходи к заданиям.</p>
             </div>
             {selectedSubject && (
               <button
                 onClick={handleBackToSubjects}
-                className="px-4 py-2 rounded-lg border border-slate-300 text-slate-700 hover:bg-slate-100 transition"
+                className="px-4 py-3 bg-pixel-purple hover:bg-pixel-purple-dark border-4 border-pixel-dark shadow-pixel hover:shadow-pixel-hover font-cute font-bold text-pixel-dark transition-all duration-100 transform hover:translate-x-1 hover:translate-y-1"
               >
-                Сменить предмет
+                ← Сменить предмет
               </button>
             )}
           </div>
@@ -285,39 +284,49 @@ export default function Dashboard() {
           {!selectedSubject && (
             <div>
               {subjectsLoading && (
-                <div className="text-slate-600">Загрузка предметов...</div>
+                <div className="bg-white border-4 border-pixel-dark p-6 text-center animate-bounce-slow">
+                  <div className="text-4xl mb-3 animate-spin">⏳</div>
+                  <div className="font-main font-semibold text-pixel-dark">Загрузка предметов...</div>
+                </div>
               )}
 
               {subjectsError && (
-                <div className="rounded-xl border border-rose-200 bg-rose-50 p-4">
-                  <p className="text-rose-700 mb-3">Не удалось загрузить предметы.</p>
+                <div className="bg-pixel-red/20 border-4 border-pixel-red-dark p-6 animate-wiggle">
+                  <p className="font-main font-semibold text-pixel-red-dark mb-4 flex items-center gap-2">
+                    <span className="text-2xl">⚠️</span>
+                    Не удалось загрузить предметы.
+                  </p>
                   <button
                     onClick={refetch}
-                    className="px-4 py-2 rounded-lg bg-rose-500 text-white hover:bg-rose-600 transition"
+                    className="px-5 py-3 bg-pixel-red-dark hover:bg-pixel-red border-4 border-pixel-dark shadow-pixel hover:shadow-pixel-hover font-cute font-bold text-white transition-all duration-100 transform hover:translate-x-1 hover:translate-y-1"
                   >
-                    Попробовать снова
+                    Попробовать снова 🔄
                   </button>
                 </div>
               )}
 
               {!subjectsLoading && !subjectsError && subjects.length === 0 && (
-                <div className="rounded-xl border border-slate-200 bg-slate-50 p-5 text-slate-600">
-                  Предметы пока не найдены. Попробуй обновить страницу чуть позже.
+                <div className="bg-white border-4 border-pixel-dark p-6 text-center">
+                  <div className="text-4xl mb-3">😔</div>
+                  <p className="font-main text-pixel-dark">Предметы пока не найдены. Попробуй обновить страницу чуть позже.</p>
                 </div>
               )}
 
               {!subjectsLoading && !subjectsError && subjects.length > 0 && (
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
                   {subjects.map((subject) => (
                     <button
                       key={subject.id}
                       onClick={() => handleSubjectSelect(subject)}
-                      className="rounded-xl border p-5 text-left hover:shadow-md transition focus:outline-none focus:ring-2 focus:ring-sky-500"
+                      className="bg-white border-4 border-pixel-dark shadow-pixel hover:shadow-pixel-hover p-6 text-left transition-all duration-100 transform hover:translate-x-1 hover:translate-y-1 focus:outline-none focus:ring-4 focus:ring-pixel-pink"
                       style={getSubjectCardStyle(subject.color)}
                     >
-                      <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Предмет</p>
-                      <h3 className="text-xl font-bold text-slate-900 mt-2">{subject.name}</h3>
-                      <p className="text-sm text-slate-600 mt-3">Открыть темы и начать решение заданий</p>
+                      <div className="flex items-center gap-3 mb-3">
+                        <span className="text-3xl">📖</span>
+                        <p className="text-xs font-main uppercase tracking-wider text-pixel-dark/60">Предмет</p>
+                      </div>
+                      <h3 className="font-cute text-xl font-bold text-pixel-dark mb-3">{subject.name}</h3>
+                      <p className="font-main text-sm text-pixel-dark/70">Открыть темы и начать решение заданий →</p>
                     </button>
                   ))}
                 </div>
@@ -327,36 +336,48 @@ export default function Dashboard() {
 
           {selectedSubject && !isPracticeStarted && (
             <div className="space-y-5">
-              <div className="inline-flex items-center rounded-full border px-4 py-2 text-sm text-slate-700" style={getSubjectBadgeStyle(selectedSubject.color)}>
+              <div className="inline-flex items-center gap-2 bg-white border-4 border-pixel-dark shadow-pixel px-5 py-3 font-cute font-bold text-pixel-dark" style={getSubjectBadgeStyle(selectedSubject.color)}>
+                <span className="text-xl">📌</span>
                 {selectedSubject.name}
               </div>
 
-              <div className="rounded-xl border border-slate-200 bg-slate-50 p-5">
-                <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
-                  <h3 className="text-xl font-semibold text-slate-900">Выбор темы</h3>
+              <div className="bg-white border-4 border-pixel-dark shadow-pixel p-6">
+                <div className="flex flex-wrap items-center justify-between gap-4 mb-5">
+                  <h3 className="font-cute text-2xl font-bold text-pixel-dark flex items-center gap-2">
+                    <span className="text-3xl">🎯</span>
+                    Выбор темы
+                  </h3>
                   <button
                     onClick={() => handleStartPractice(null)}
-                    className="px-4 py-2 rounded-lg bg-sky-600 text-white hover:bg-sky-700 transition"
+                    className="px-5 py-3 bg-pixel-pink hover:bg-pixel-pink-dark border-4 border-pixel-dark shadow-pixel hover:shadow-pixel-hover font-cute font-bold text-pixel-dark transition-all duration-100 transform hover:translate-x-1 hover:translate-y-1"
                   >
-                    Все задания предмета
+                    Все задания предмета 🚀
                   </button>
                 </div>
 
-                {themesLoading && <p className="text-slate-600">Загрузка тем...</p>}
+                {themesLoading && (
+                  <div className="text-center py-4">
+                    <div className="text-3xl mb-2 animate-spin inline-block">⏳</div>
+                    <p className="font-main text-pixel-dark">Загрузка тем...</p>
+                  </div>
+                )}
 
                 {!themesLoading && themesError && (
-                  <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-amber-800">
-                    Не удалось загрузить темы. Можно начать с общего набора заданий по предмету.
+                  <div className="bg-pixel-orange/30 border-4 border-pixel-orange-dark p-5">
+                    <p className="font-main font-semibold text-pixel-dark flex items-center gap-2">
+                      <span className="text-xl">⚠️</span>
+                      Не удалось загрузить темы. Можно начать с общего набора заданий по предмету.
+                    </p>
                   </div>
                 )}
 
                 {!themesLoading && themes.length > 0 && (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {themes.map((theme) => (
                       <button
                         key={theme.id}
                         onClick={() => handleStartPractice(theme)}
-                        className="p-4 rounded-lg border border-slate-200 bg-white text-slate-900 hover:border-sky-300 hover:bg-sky-50 transition text-left"
+                        className="p-4 bg-pixel-cream border-4 border-pixel-dark shadow-pixel hover:shadow-pixel-hover hover:bg-pixel-yellow transition-all duration-100 transform hover:translate-x-1 hover:translate-y-1 text-left font-main font-semibold text-pixel-dark"
                       >
                         {theme.name}
                       </button>
@@ -365,7 +386,10 @@ export default function Dashboard() {
                 )}
 
                 {!themesLoading && themes.length === 0 && (
-                  <p className="text-slate-600">Для этого предмета нет отдельных тем. Можно решать общий набор заданий.</p>
+                  <div className="text-center py-4">
+                    <div className="text-3xl mb-2">📝</div>
+                    <p className="font-main text-pixel-dark">Для этого предмета нет отдельных тем. Можно решать общий набор заданий.</p>
+                  </div>
                 )}
               </div>
             </div>
@@ -375,23 +399,30 @@ export default function Dashboard() {
             <div className="space-y-5">
               <div className="flex flex-wrap items-start justify-between gap-4">
                 <div>
-                  <h3 className="text-2xl font-bold text-slate-900">Решение заданий</h3>
-                  <p className="text-slate-500 mt-1">
+                  <h3 className="font-cute text-3xl font-bold text-pixel-dark flex items-center gap-3">
+                    <span className="text-4xl">✍️</span>
+                    Решение заданий
+                  </h3>
+                  <p className="font-main text-pixel-dark/70 mt-2">
                     {selectedSubject.name}
                     {selectedTheme ? ` • ${selectedTheme.name}` : ' • все задания'}
                   </p>
                 </div>
-                <div className="flex items-center gap-3">
-                  <label className="text-sm text-slate-600" htmlFor="task-sort-order">Сортировка</label>
-                  <select
-                    id="task-sort-order"
-                    value={taskSortOrder}
-                    onChange={handleSortChange}
-                    className="px-3 py-2 rounded-lg border border-slate-300 bg-white text-slate-700"
-                  >
-                    <option value="asc">По возрастанию ID</option>
-                    <option value="desc">По убыванию ID</option>
-                  </select>
+                <div className="flex items-center gap-3 flex-wrap">
+                  <div className="flex items-center gap-2">
+                    <label className="font-main font-semibold text-pixel-dark" htmlFor="task-sort-order">
+                      🔀 Сортировка:
+                    </label>
+                    <select
+                      id="task-sort-order"
+                      value={taskSortOrder}
+                      onChange={handleSortChange}
+                      className="px-3 py-2 bg-white border-4 border-pixel-dark shadow-pixel-sm font-main font-semibold text-pixel-dark focus:border-pixel-pink focus:shadow-pixel-pink transition-all"
+                    >
+                      <option value="asc">По возрастанию ID</option>
+                      <option value="desc">По убыванию ID</option>
+                    </select>
+                  </div>
                   <button
                     onClick={() => {
                       setIsPracticeStarted(false)
@@ -399,9 +430,9 @@ export default function Dashboard() {
                       resetSession()
                       resetPracticeView()
                     }}
-                    className="px-4 py-2 rounded-lg border border-slate-300 text-slate-700 hover:bg-slate-100 transition"
+                    className="px-4 py-2 bg-pixel-purple hover:bg-pixel-purple-dark border-4 border-pixel-dark shadow-pixel hover:shadow-pixel-hover font-cute font-bold text-pixel-dark transition-all duration-100 transform hover:translate-x-1 hover:translate-y-1"
                   >
-                    Сменить тему
+                    Сменить тему 🔄
                   </button>
                 </div>
               </div>
@@ -409,12 +440,13 @@ export default function Dashboard() {
               <SubjectBanner banner={banner} />
 
               {answersCount > 0 && (
-                <div className="p-4 bg-sky-50 rounded-lg border border-sky-200">
-                  <p className="text-sm text-slate-700">
-                    Проверено заданий: <strong>{answersCount}</strong>
+                <div className="bg-pixel-blue/30 border-4 border-pixel-blue-dark shadow-pixel p-5">
+                  <p className="font-main font-semibold text-pixel-dark flex items-center gap-2">
+                    <span className="text-xl">✅</span>
+                    Проверено заданий: <strong className="font-cute text-lg">{answersCount}</strong>
                   </p>
                   {pagination && (
-                    <p className="text-xs text-slate-500 mt-1">
+                    <p className="font-main text-sm text-pixel-dark/70 mt-2">
                       Страница {pagination.currentPage || 1} из {pagination.totalPages || 1}
                     </p>
                   )}
@@ -422,38 +454,45 @@ export default function Dashboard() {
               )}
 
               {(questionError || submitError) && (
-                <div className="rounded-lg border border-rose-200 bg-rose-50 p-4 text-rose-700">
-                  {questionError || submitError}
+                <div className="bg-pixel-red/20 border-4 border-pixel-red-dark p-5 animate-wiggle">
+                  <p className="font-main font-semibold text-pixel-red-dark flex items-center gap-2">
+                    <span className="text-xl">⚠️</span>
+                    {questionError || submitError}
+                  </p>
                 </div>
               )}
 
               {questionLoading && questions.length === 0 && !noTasks && (
-                <div className="rounded-xl border border-slate-200 bg-slate-50 p-6 text-slate-600 text-center">
-                  Загружаем список заданий...
+                <div className="bg-white border-4 border-pixel-dark p-8 text-center animate-bounce-slow">
+                  <div className="text-5xl mb-4 animate-spin">⏳</div>
+                  <div className="font-cute text-xl text-pixel-dark">Загружаем список заданий...</div>
                 </div>
               )}
 
               {!questionLoading && !noTasks && questions.length > 0 && (
-                <div className="space-y-4">
+                <div className="space-y-5">
                   {questions.map((questionItem, index) => {
                     const result = resultsByQuestion[questionItem.id]
                     const isSubmitting = submittingQuestionId === questionItem.id
 
                     return (
-                      <div key={questionItem.id} className="rounded-xl border border-slate-200 bg-slate-50 p-4 md:p-5 space-y-4">
-                        <div className="flex flex-wrap items-center justify-between gap-2">
-                          <p className="text-sm font-semibold text-slate-700">
-                            Задание {index + 1}
-                          </p>
+                      <div key={questionItem.id} className="bg-white border-4 border-pixel-dark shadow-pixel p-5 md:p-6 space-y-4">
+                        <div className="flex flex-wrap items-center justify-between gap-3">
+                          <div className="flex items-center gap-3">
+                            <span className="text-2xl">#{index + 1}</span>
+                            <p className="font-cute text-lg font-bold text-pixel-dark">
+                              Задание {index + 1}
+                            </p>
+                          </div>
                           {result && (
                             <span
-                              className={`px-3 py-1 rounded-full text-xs font-semibold ${
+                              className={`px-4 py-2 border-3 border-pixel-dark shadow-pixel font-cute font-bold text-sm ${
                                 result.is_correct
-                                  ? 'bg-emerald-100 text-emerald-700'
-                                  : 'bg-rose-100 text-rose-700'
+                                  ? 'bg-pixel-green text-pixel-dark'
+                                  : 'bg-pixel-red text-pixel-dark'
                               }`}
                             >
-                              {result.is_correct ? 'Решено верно' : 'Нужна корректировка'}
+                              {result.is_correct ? '✅ Верно!' : '❌ Ошибка'}
                             </span>
                           )}
                         </div>
@@ -466,22 +505,22 @@ export default function Dashboard() {
 
                         {result && (
                           <div
-                            className={`rounded-lg border p-4 ${
+                            className={`border-4 border-pixel-dark shadow-pixel p-5 ${
                               result.is_correct
-                                ? 'border-emerald-200 bg-emerald-50'
-                                : 'border-rose-200 bg-rose-50'
+                                ? 'bg-pixel-green/30'
+                                : 'bg-pixel-red/30'
                             }`}
                           >
-                            <p className="text-sm font-semibold text-slate-900">
-                              {result.is_correct ? 'Верно' : 'Есть ошибка'}
+                            <p className="font-cute text-lg font-bold text-pixel-dark mb-2 flex items-center gap-2">
+                              {result.is_correct ? '🎉 Отлично!' : '💡 Подсказка'}
                             </p>
                             {!result.is_correct && result.correct_answer && (
-                              <p className="text-sm text-slate-700 mt-1">
-                                Правильный ответ: <strong>{result.correct_answer}</strong>
+                              <p className="font-main text-pixel-dark mb-2">
+                                Правильный ответ: <strong className="font-cute">{result.correct_answer}</strong>
                               </p>
                             )}
                             {result.explanation && (
-                              <p className="text-sm text-slate-700 mt-2">{result.explanation}</p>
+                              <p className="font-main text-sm text-pixel-dark/80 mt-2">{result.explanation}</p>
                             )}
                           </div>
                         )}
@@ -492,33 +531,37 @@ export default function Dashboard() {
               )}
 
               {noTasks && (
-                <div className="bg-white rounded-xl border border-slate-200 p-6 text-center space-y-4">
-                  <h4 className="text-2xl font-bold text-slate-900">Задания закончились</h4>
-                  <p className="text-slate-600">Для выбранного фильтра пока нет заданий на этой странице.</p>
+                <div className="bg-pixel-cream border-6 border-pixel-dark shadow-pixel-lg p-8 text-center space-y-4">
+                  <div className="text-6xl mb-4 animate-bounce-slow">📭</div>
+                  <h4 className="font-cute text-3xl font-bold text-pixel-dark">Задания закончились</h4>
+                  <p className="font-main text-pixel-dark/70">Для выбранного фильтра пока нет заданий на этой странице.</p>
                   <button
                     onClick={() => handleLoadPage(pagination?.currentPage || 1)}
-                    className="py-3 px-5 bg-sky-600 text-white rounded-lg font-medium hover:bg-sky-700 transition"
+                    className="py-3 px-6 bg-pixel-blue hover:bg-pixel-blue-dark border-4 border-pixel-dark shadow-pixel hover:shadow-pixel-hover font-cute font-bold text-pixel-dark transition-all duration-100 transform hover:translate-x-1 hover:translate-y-1"
                   >
-                    Обновить список
+                    Обновить список 🔄
                   </button>
                 </div>
               )}
 
               {pagination && (pagination.totalPages || 1) > 1 && (
-                <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
+                <div className="flex flex-wrap items-center justify-between gap-4 pt-4">
                   <button
                     onClick={() => handleLoadPage((pagination.currentPage || 1) - 1)}
                     disabled={questionLoading || (pagination.currentPage || 1) <= 1}
-                    className="px-4 py-2 rounded-lg border border-slate-300 text-slate-700 hover:bg-slate-100 disabled:opacity-50 disabled:cursor-not-allowed transition"
+                    className="px-5 py-3 bg-pixel-purple hover:bg-pixel-purple-dark border-4 border-pixel-dark shadow-pixel hover:shadow-pixel-hover font-cute font-bold text-pixel-dark transition-all duration-100 transform hover:translate-x-1 hover:translate-y-1 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
                   >
-                    ← Предыдущая страница
+                    ← Предыдущая
                   </button>
+                  <div className="font-main font-semibold text-pixel-dark">
+                    Страница {pagination.currentPage || 1} из {pagination.totalPages || 1}
+                  </div>
                   <button
                     onClick={() => handleLoadPage((pagination.currentPage || 1) + 1)}
                     disabled={questionLoading || (pagination.currentPage || 1) >= (pagination.totalPages || 1)}
-                    className="px-4 py-2 rounded-lg border border-slate-300 text-slate-700 hover:bg-slate-100 disabled:opacity-50 disabled:cursor-not-allowed transition"
+                    className="px-5 py-3 bg-pixel-purple hover:bg-pixel-purple-dark border-4 border-pixel-dark shadow-pixel hover:shadow-pixel-hover font-cute font-bold text-pixel-dark transition-all duration-100 transform hover:translate-x-1 hover:translate-y-1 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
                   >
-                    Следующая страница →
+                    Следующая →
                   </button>
                 </div>
               )}
@@ -526,18 +569,21 @@ export default function Dashboard() {
           )}
         </section>
 
-        <section className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 md:p-8">
-          <h2 className="text-xl font-bold text-slate-900 mb-4">Другие разделы</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+        <section className="bg-pixel-cream border-6 border-pixel-dark shadow-pixel-lg p-6 md:p-8 animate-fade-in">
+          <h2 className="font-cute text-2xl font-bold text-pixel-dark mb-6 flex items-center gap-3">
+            <span className="text-3xl">🗂️</span>
+            Другие разделы
+          </h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-5">
             {navCards.map((card) => (
               <button
                 key={card.path}
                 onClick={() => navigate(card.path)}
-                className="rounded-xl border border-slate-200 bg-slate-50 hover:bg-sky-50 hover:border-sky-200 p-4 text-left transition"
+                className="bg-white border-4 border-pixel-dark shadow-pixel hover:shadow-pixel-hover hover:bg-pixel-yellow p-5 text-left transition-all duration-100 transform hover:translate-x-1 hover:translate-y-1"
               >
-                <div className="text-2xl mb-2">{card.icon}</div>
-                <h3 className="text-lg font-semibold text-slate-900">{card.title}</h3>
-                <p className="text-sm text-slate-600 mt-1">{card.description}</p>
+                <div className="text-4xl mb-3 animate-float">{card.icon}</div>
+                <h3 className="font-cute text-lg font-bold text-pixel-dark mb-2">{card.title}</h3>
+                <p className="font-main text-sm text-pixel-dark/70">{card.description}</p>
               </button>
             ))}
           </div>

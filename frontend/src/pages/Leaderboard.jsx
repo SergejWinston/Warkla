@@ -1,5 +1,6 @@
 import { useNavigate } from 'react-router-dom'
 import { useLeaderboard } from '../hooks'
+import Layout from '../components/Layout'
 
 export default function Leaderboard() {
   const navigate = useNavigate()
@@ -13,83 +14,90 @@ export default function Leaderboard() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-purple-50 p-6">
-      <div className="max-w-4xl mx-auto">
+    <Layout>
+      <div className="max-w-5xl mx-auto">
         {/* Header */}
-        <div className="mb-8">
+        <div className="mb-8 animate-slide-down">
           <button
             onClick={() => navigate('/dashboard')}
-            className="text-blue-500 hover:text-blue-700 font-medium mb-4"
+            className="px-4 py-2 bg-pixel-purple hover:bg-pixel-purple-dark border-4 border-pixel-dark shadow-pixel hover:shadow-pixel-hover font-cute font-bold text-pixel-dark transition-all duration-100 transform hover:translate-x-1 hover:translate-y-1 mb-6 flex items-center gap-2"
           >
-            ← Назад к меню
+            <span>←</span>
+            Назад к меню
           </button>
-          <h1 className="text-3xl font-bold text-gray-900">🏆 Лучшие игроки</h1>
+          <h1 className="font-cute text-4xl font-bold text-pixel-dark flex items-center gap-3">
+            <span className="text-5xl animate-bounce-slow">🏆</span>
+            Лучшие игроки
+          </h1>
         </div>
 
         {isLoading ? (
-          <div className="text-center text-gray-600 py-8">Загрузка...</div>
+          <div className="bg-pixel-cream border-4 border-pixel-dark p-10 text-center animate-bounce-slow">
+            <div className="text-5xl mb-4 animate-spin">⏳</div>
+            <div className="font-cute text-xl text-pixel-dark">Загрузка...</div>
+          </div>
         ) : leaderboard && leaderboard.length > 0 ? (
-          <div className="bg-white rounded-lg shadow overflow-hidden">
-            <table className="w-full">
-              <thead className="bg-gradient-to-r from-blue-500 to-purple-500 text-white">
-                <tr>
-                  <th className="px-6 py-4 text-left font-bold">Место</th>
-                  <th className="px-6 py-4 text-left font-bold">Пользователь</th>
-                  <th className="px-6 py-4 text-center font-bold">Вопросов решено</th>
-                  <th className="px-6 py-4 text-center font-bold">Правильно</th>
-                  <th className="px-6 py-4 text-center font-bold">Точность</th>
-                </tr>
-              </thead>
-              <tbody>
-                {leaderboard.map((user, index) => {
-                  const accuracy = user.total_answers > 0
-                    ? Math.round((user.correct_answers / user.total_answers) * 100)
-                    : 0
+          <div className="bg-pixel-cream border-6 border-pixel-dark shadow-pixel-lg overflow-hidden animate-fade-in">
+            <div className="bg-gradient-to-r from-pixel-yellow to-pixel-orange border-b-6 border-pixel-dark p-5">
+              <div className="grid grid-cols-5 gap-4 font-cute font-bold text-pixel-dark">
+                <div>Место</div>
+                <div>Пользователь</div>
+                <div className="text-center">Решено</div>
+                <div className="text-center">Правильно</div>
+                <div className="text-center">Точность</div>
+              </div>
+            </div>
+            <div className="divide-y-4 divide-pixel-dark">
+              {leaderboard.map((user, index) => {
+                const accuracy = user.total_answers > 0
+                  ? Math.round((user.correct_answers / user.total_answers) * 100)
+                  : 0
 
-                  const medal = getMedalEmoji(index)
+                const medal = getMedalEmoji(index)
 
-                  return (
-                    <tr
-                      key={user.id}
-                      className={`border-b transition ${
-                        index < 3
-                          ? 'bg-yellow-50 hover:bg-yellow-100'
-                          : 'hover:bg-gray-50'
-                      }`}
-                    >
-                      <td className="px-6 py-4 font-bold text-lg">
-                        {medal ? `${medal} ${index + 1}` : index + 1}
-                      </td>
-                      <td className="px-6 py-4 font-medium text-gray-900">
-                        {user.username}
-                      </td>
-                      <td className="px-6 py-4 text-center text-gray-600">
-                        {user.total_answers}
-                      </td>
-                      <td className="px-6 py-4 text-center font-semibold text-green-600">
-                        {user.correct_answers}
-                      </td>
-                      <td className="px-6 py-4 text-center font-bold">
-                        <span className={
-                          accuracy >= 80 ? 'text-green-600' :
-                          accuracy >= 60 ? 'text-yellow-600' :
-                          'text-red-600'
-                        }>
-                          {accuracy}%
-                        </span>
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
+                return (
+                  <div
+                    key={user.id}
+                    className={`grid grid-cols-5 gap-4 p-5 transition-colors ${
+                      index < 3
+                        ? 'bg-pixel-yellow/30 hover:bg-pixel-yellow/50'
+                        : 'bg-white hover:bg-pixel-cream'
+                    }`}
+                  >
+                    <div className="font-cute text-2xl font-bold text-pixel-dark flex items-center gap-2">
+                      {medal && <span className="text-3xl">{medal}</span>}
+                      {index + 1}
+                    </div>
+                    <div className="font-main font-bold text-pixel-dark flex items-center">
+                      {user.username}
+                    </div>
+                    <div className="font-cute text-lg font-bold text-pixel-dark flex items-center justify-center">
+                      {user.total_answers}
+                    </div>
+                    <div className="font-cute text-lg font-bold text-pixel-green-dark flex items-center justify-center">
+                      {user.correct_answers}
+                    </div>
+                    <div className="font-cute text-lg font-bold flex items-center justify-center">
+                      <span className={`px-3 py-1 border-3 border-pixel-dark shadow-pixel-sm ${
+                        accuracy >= 80 ? 'bg-pixel-green text-pixel-dark' :
+                        accuracy >= 60 ? 'bg-pixel-yellow text-pixel-dark' :
+                        'bg-pixel-red text-pixel-dark'
+                      }`}>
+                        {accuracy}%
+                      </span>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
           </div>
         ) : (
-          <div className="text-center text-gray-600 py-8">
-            Лидеров еще нет. Начни решать вопросы и займи первое место!
+          <div className="bg-pixel-cream border-6 border-pixel-dark shadow-pixel-lg p-10 text-center">
+            <div className="text-6xl mb-4 animate-bounce-slow">🎯</div>
+            <p className="font-cute text-xl text-pixel-dark">Лидеров еще нет. Начни решать вопросы и займи первое место!</p>
           </div>
         )}
       </div>
-    </div>
+    </Layout>
   )
 }
