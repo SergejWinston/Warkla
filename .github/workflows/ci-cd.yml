@@ -160,6 +160,9 @@ jobs:
         chmod 600 ~/.ssh/deploy_key
         ssh-keyscan -p "$SSH_PORT" -H "$SSH_HOST" >> ~/.ssh/known_hosts
 
+        ssh -p "$SSH_PORT" -i ~/.ssh/deploy_key "${SSH_USER}@${SSH_HOST}" \
+          "mkdir -p ${DEPLOY_PATH}"
+
         rsync -avz --delete \
           -e "ssh -p $SSH_PORT -i ~/.ssh/deploy_key" \
           --exclude='.git' \
@@ -172,7 +175,9 @@ jobs:
 
         ssh -p "$SSH_PORT" -i ~/.ssh/deploy_key "${SSH_USER}@${SSH_HOST}" \
           "cd ${DEPLOY_PATH} && \
-          python -m venv venv && \
+          PYTHON_BIN=\$(command -v python3 || command -v python || true) && \
+          if [ -z \"\$PYTHON_BIN\" ]; then echo 'Neither python3 nor python found on server' && exit 1; fi && \
+          \$PYTHON_BIN -m venv venv && \
           source venv/bin/activate && \
           pip install --upgrade pip && \
           pip install -r requirements.txt && \

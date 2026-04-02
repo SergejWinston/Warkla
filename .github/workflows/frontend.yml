@@ -121,6 +121,9 @@ jobs:
         chmod 600 ~/.ssh/deploy_key
         ssh-keyscan -p "$SSH_PORT" -H "$SSH_HOST" >> ~/.ssh/known_hosts 2>/dev/null
 
+        ssh -p "$SSH_PORT" -i ~/.ssh/deploy_key "${SSH_USER}@${SSH_HOST}" \
+          "mkdir -p ${DEPLOY_PATH}/frontend/dist"
+
         # Deploy frontend to web server
         rsync -avz --delete \
           -e "ssh -p $SSH_PORT -i ~/.ssh/deploy_key" \
