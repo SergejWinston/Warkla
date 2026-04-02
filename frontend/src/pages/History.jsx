@@ -10,11 +10,18 @@ export default function History() {
   const [page, setPage] = useState(0)
   const [deletingId, setDeletingId] = useState(null)
 
+  const getHistoryItemId = (answer) => answer?.id ?? answer?.answer_id ?? answer?.user_answer_id ?? null
+
   useEffect(() => {
     fetchHistory({ limit: 20, offset: page * 20 })
   }, [fetchHistory, page])
 
   const handleDelete = async (answerId) => {
+    if (answerId == null) {
+      window.alert('Не удалось определить идентификатор записи для удаления.')
+      return
+    }
+
     const shouldDelete = window.confirm('Удалить это задание из истории?')
     if (!shouldDelete) {
       return
@@ -31,7 +38,10 @@ export default function History() {
 
     if (history.length === 1 && page > 0) {
       setPage((prev) => Math.max(0, prev - 1))
+      return
     }
+
+    await fetchHistory({ limit: 20, offset: page * 20 })
   }
 
   return (
@@ -66,53 +76,58 @@ export default function History() {
         ) : history && history.length > 0 ? (
           <div>
             <div className="space-y-5 mb-8">
-              {history.map((answer) => (
-                <div key={answer.id} className="bg-pixel-cream border-4 border-pixel-dark shadow-pixel p-5 hover:shadow-pixel-hover transition-all duration-100 transform hover:translate-x-1 hover:translate-y-1">
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="flex-1">
-                      <h3 className="font-cute text-lg font-bold text-pixel-dark mb-3">{decodeHtmlEntities(answer.question_text) || 'Текст задания недоступен'}</h3>
-                      <div className="font-main text-sm text-pixel-dark space-y-2">
-                        <p className="flex items-start gap-2">
-                          <span className="font-semibold">✍️ Твой ответ:</span>
-                          <span className={answer.is_correct ? 'text-pixel-green-dark font-bold' : 'text-pixel-red-dark font-bold'}>
-                            {answer.user_answer || '—'}
-                          </span>
-                        </p>
-                        {!answer.is_correct && answer.correct_answer && (
+              {history.map((answer) => {
+                const answerId = getHistoryItemId(answer)
+                const rowKey = answerId ?? `${answer.question_id}-${answer.answered_at}`
+
+                return (
+                  <div key={rowKey} className="bg-pixel-cream border-4 border-pixel-dark shadow-pixel p-5 hover:shadow-pixel-hover transition-all duration-100 transform hover:translate-x-1 hover:translate-y-1">
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="flex-1">
+                        <h3 className="font-cute text-lg font-bold text-pixel-dark mb-3">{decodeHtmlEntities(answer.question_text) || 'Текст задания недоступен'}</h3>
+                        <div className="font-main text-sm text-pixel-dark space-y-2">
                           <p className="flex items-start gap-2">
-                            <span className="font-semibold">✅ Правильный:</span>
-                            <span className="font-bold text-pixel-green-dark">{answer.correct_answer}</span>
+                            <span className="font-semibold">✍️ Твой ответ:</span>
+                            <span className={answer.is_correct ? 'text-pixel-green-dark font-bold' : 'text-pixel-red-dark font-bold'}>
+                              {answer.user_answer || '—'}
+                            </span>
                           </p>
-                        )}
-                        {answer.time_spent && (
-                          <p className="flex items-center gap-2">
-                            <span className="font-semibold">⏱️ Время:</span>
-                            <span className="font-bold">{answer.time_spent}с</span>
+                          {!answer.is_correct && answer.correct_answer && (
+                            <p className="flex items-start gap-2">
+                              <span className="font-semibold">✅ Правильный:</span>
+                              <span className="font-bold text-pixel-green-dark">{answer.correct_answer}</span>
+                            </p>
+                          )}
+                          {answer.time_spent && (
+                            <p className="flex items-center gap-2">
+                              <span className="font-semibold">⏱️ Время:</span>
+                              <span className="font-bold">{answer.time_spent}с</span>
+                            </p>
+                          )}
+                          <p className="text-xs text-pixel-dark/60 flex items-center gap-2">
+                            <span>📅</span>
+                            {new Date(answer.answered_at).toLocaleString('ru-RU')}
                           </p>
-                        )}
-                        <p className="text-xs text-pixel-dark/60 flex items-center gap-2">
-                          <span>📅</span>
-                          {new Date(answer.answered_at).toLocaleString('ru-RU')}
-                        </p>
+                        </div>
                       </div>
-                    </div>
-                    <div className="flex flex-col items-end gap-3 ml-4">
-                      <button
-                        onClick={() => handleDelete(answer.id)}
-                        disabled={deletingId === answer.id}
-                        className="px-3 py-2 bg-pixel-red hover:bg-pixel-red-dark border-3 border-pixel-dark shadow-pixel-sm hover:shadow-pixel font-main font-bold text-xs text-white transition-all duration-100 transform hover:translate-x-0.5 hover:translate-y-0.5 disabled:opacity-60 disabled:cursor-not-allowed disabled:transform-none"
-                      >
-                        {deletingId === answer.id ? 'Удаляю...' : 'Удалить'}
-                      </button>
-                      <div className={`px-3 py-2 border-3 border-pixel-dark shadow-pixel-sm font-main font-bold text-xs uppercase tracking-wide ${
-                        answer.is_correct ? 'bg-pixel-green text-pixel-dark' : 'bg-pixel-red text-white'
-                      }`}>
-                        {answer.is_correct ? 'Верно' : 'Ошибка'}
+                      <div className="flex flex-col items-end gap-3 ml-4">
+                        <button
+                          onClick={() => handleDelete(answerId)}
+                          disabled={answerId == null || deletingId === answerId}
+                          className="px-3 py-2 bg-pixel-red hover:bg-pixel-red-dark border-3 border-pixel-dark shadow-pixel-sm hover:shadow-pixel font-main font-bold text-xs text-white transition-all duration-100 transform hover:translate-x-0.5 hover:translate-y-0.5 disabled:opacity-60 disabled:cursor-not-allowed disabled:transform-none"
+                        >
+                          {deletingId === answerId ? 'Удаляю...' : 'Удалить'}
+                        </button>
+                        <div className={`px-3 py-2 border-3 border-pixel-dark shadow-pixel-sm font-main font-bold text-xs uppercase tracking-wide ${
+                          answer.is_correct ? 'bg-pixel-green text-pixel-dark' : 'bg-pixel-red text-white'
+                        }`}>
+                          {answer.is_correct ? 'Верно' : 'Ошибка'}
+                        </div>
                       </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                )
+              })}
             </div>
 
             {/* Pagination */}

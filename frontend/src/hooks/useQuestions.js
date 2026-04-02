@@ -147,6 +147,11 @@ export const useAnswerHistory = () => {
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState(null)
 
+  const getHistoryItemId = useCallback((item) => {
+    if (!item || typeof item !== 'object') return null
+    return item.id ?? item.answer_id ?? item.user_answer_id ?? null
+  }, [])
+
   const fetchHistory = useCallback(async (params = {}) => {
     setIsLoading(true)
     setError(null)
@@ -165,15 +170,22 @@ export const useAnswerHistory = () => {
 
   const deleteHistoryItem = useCallback(async (answerId) => {
     setError(null)
+    const normalizedId = answerId == null ? '' : String(answerId)
+
+    if (!normalizedId) {
+      setError('History item id is missing')
+      return false
+    }
+
     try {
-      await answersAPI.deleteHistoryItem(answerId)
-      setHistory((prev) => prev.filter((item) => item.id !== answerId))
+      await answersAPI.deleteHistoryItem(normalizedId)
+      setHistory((prev) => prev.filter((item) => String(getHistoryItemId(item)) !== normalizedId))
       return true
     } catch (err) {
       setError(err.response?.data?.error || 'Failed to delete history item')
       return false
     }
-  }, [])
+  }, [getHistoryItemId])
 
   return { history, isLoading, error, fetchHistory, deleteHistoryItem }
 }
