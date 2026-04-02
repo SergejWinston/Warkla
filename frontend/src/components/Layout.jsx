@@ -1,5 +1,6 @@
 import { NavLink, useNavigate } from 'react-router-dom'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { useAuth } from '../hooks'
 
 const pixelIcons = {
   dashboard: '🏠',
@@ -17,11 +18,16 @@ export default function Layout({ children }) {
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false)
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false)
-  const user = JSON.parse(localStorage.getItem('user') || '{}')
+  const { user, logout, getMe, isAuthenticated } = useAuth()
+
+  useEffect(() => {
+    if (isAuthenticated && !user) {
+      getMe()
+    }
+  }, [getMe, isAuthenticated, user])
 
   const handleLogout = () => {
-    localStorage.removeItem('token')
-    localStorage.removeItem('user')
+    logout()
     navigate('/login')
   }
 
@@ -81,24 +87,24 @@ export default function Layout({ children }) {
           <div className="p-4 border-b-4 border-pixel-dark bg-pixel-pink/30">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 bg-pixel-blue border-3 border-pixel-dark shadow-pixel flex items-center justify-center text-xl font-cute font-bold text-pixel-dark flex-shrink-0">
-                {user.username?.[0]?.toUpperCase() || 'У'}
+                {user?.username?.[0]?.toUpperCase() || 'У'}
               </div>
               {sidebarOpen && (
                 <div className="hidden lg:block overflow-hidden">
                   <p className="font-cute text-sm font-bold text-pixel-dark truncate">
-                    {user.username || 'Студент'}
+                    {user?.username || 'Студент'}
                   </p>
                   <p className="text-xs text-pixel-dark/70 font-main truncate">
-                    {user.email || 'student@ege.ru'}
+                    {user?.email || 'student@ege.ru'}
                   </p>
                 </div>
               )}
               <div className="lg:hidden overflow-hidden">
                 <p className="font-cute text-sm font-bold text-pixel-dark truncate">
-                  {user.username || 'Студент'}
+                  {user?.username || 'Студент'}
                 </p>
                 <p className="text-xs text-pixel-dark/70 font-main truncate">
-                  {user.email || 'student@ege.ru'}
+                  {user?.email || 'student@ege.ru'}
                 </p>
               </div>
             </div>

@@ -24,5 +24,5 @@ EXPOSE 5000
 HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
     CMD curl -f http://localhost:5000/api/health || exit 1
 
-# Run both Flask API (with gunicorn) and Telegram Bot
-CMD ["sh", "-c", "gunicorn --bind 0.0.0.0:5000 --workers 2 --timeout 120 'app:create_app()' & python -c 'from bot.main import start_bot; import asyncio; asyncio.run(start_bot())' & wait"]
+# Run Flask API only
+CMD ["gunicorn", "--bind", "0.0.0.0:5000", "--workers", "2", "--timeout", "120", "app:create_app()"]

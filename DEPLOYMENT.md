@@ -18,24 +18,12 @@ npm install
 cd ..
 ```
 
-### 2. Запуск Backend + Bot
+### 2. Запуск Backend
 
 **Терминал 1 - Flask API:**
 ```bash
 python run.py flask
 # → Flask запустится на http://localhost:5000
-```
-
-**Терминал 2 - Telegram Bot:**
-```bash
-python run.py bot
-# → Bot начнет получать обновления по polling
-```
-
-**Или оба одновременно:**
-```bash
-python run.py
-# Обе компоненты запустятся в отдельных потоках
 ```
 
 ### 3. Запуск Frontend
@@ -125,7 +113,7 @@ WorkingDirectory=/opt/ege-bot
 Environment="PATH=/opt/ege-bot/venv/bin"
 Environment="FLASK_ENV=production"
 Environment="REDIS_URL=redis://localhost:6379/0"
-ExecStart=/opt/ege-bot/venv/bin/python run.py all
+ExecStart=/opt/ege-bot/venv/bin/python run.py flask
 Restart=always
 RestartSec=10
 
@@ -218,17 +206,6 @@ redis-cli ping
 # PONG
 ```
 
-### Telegram Bot ничего не делает:
-```
-# Убедись, что установлен TELEGRAM_BOT_TOKEN в .env
-echo $TELEGRAM_BOT_TOKEN
-
-# Проверь логи
-python run.py bot
-```
-
----
-
 ## ✅ Чек-лист перед deployment
 
 - [ ] `.env` с валидными токенами
@@ -273,5 +250,4 @@ curl http://localhost:5000/api/questions/count \
 - Проверь http://your-domain.com → должна открыться история
 - Попробуй залогиниться → решать вопросы → проверь статистику
 - Тестируй на разных устройствах (мобильная адаптивность)
-- Проверь Telegram бота (если TELEGRAM_BOT_TOKEN установлен)
 

@@ -12,10 +12,17 @@ on:
       - 'frontend/**'
   workflow_dispatch:
 
+concurrency:
+  group: frontend-ci-cd-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   lint-and-build:
     runs-on: ubuntu-latest
     name: Lint & Build Frontend
+    permissions:
+      contents: read
+    timeout-minutes: 15
 
     steps:
     - uses: actions/checkout@v4
@@ -31,7 +38,13 @@ jobs:
       run: cd frontend && npm ci
 
     - name: Lint with ESLint
-      run: cd frontend && npm run lint 2>/dev/null || echo "ESLint not configured (optional)"
+      run: |
+        cd frontend
+        if node -e "const p=require('./package.json');process.exit(p?.scripts?.lint ? 0 : 1)"; then
+          npm run lint
+        else
+          echo "ESLint script not configured, skipping lint."
+        fi
 
     - name: Build
       run: cd frontend && npm run build
@@ -58,6 +71,7 @@ jobs:
     runs-on: ubuntu-latest
     name: Deploy Frontend
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    timeout-minutes: 15
 
     steps:
     - uses: actions/checkout@v4
@@ -67,6 +81,18 @@ jobs:
       with:
         name: frontend-dist
         path: frontend/dist/
+
+    - name: Validate deploy secrets
+      env:
+        DEPLOY_KEY: ${{ secrets.DEPLOY_KEY }}
+        DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+        DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+        DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
+      run: |
+        test -n "$DEPLOY_KEY"
+        test -n "$DEPLOY_HOST"
+        test -n "$DEPLOY_USER"
+        test -n "$DEPLOY_PATH"
 
     - name: Deploy to server
       env:

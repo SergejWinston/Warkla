@@ -1,6 +1,6 @@
 # EGE-Bot: Интерактивный помощник для подготовки к ЕГЭ
 
-Telegram-бот + веб-приложение для подготовки школьников к ЕГЭ. Бот генерирует вопросы по выбранному предмету, проверяет ответы, ведет статистику прогресса и объясняет ошибки.
+Веб-приложение + Flask API для подготовки школьников к ЕГЭ. Сервис генерирует вопросы по выбранному предмету, проверяет ответы, ведет статистику прогресса и объясняет ошибки.
 
 ## Основные возможности
 
@@ -10,15 +10,12 @@ Telegram-бот + веб-приложение для подготовки шко
 - **Разные типы вопросов** - выбор ответа, ввод числа, краткий текстовый ответ, множественный выбор
 - **Проверка ответов** - Автоматическая проверка правильности с объяснением ошибок
 - **Статистика и прогресс** - Процент правильных ответов по предметам и темам, визуализация графиков
-- **Ежедневная рассылка** - Уведомления с вопросом дня и напоминаниями о сложных темах
-- **Telegram-бот** - Полная интеграция с Telegram для удобного доступа
 - **Веб-приложение** - React/Vite приложение для подробной аналитики
 
 ## Технический стек
 
 ### Backend
 - Flask, Flask-SQLAlchemy, Flask-JWT-Extended
-- aiogram для Telegram Bot
 - Redis для кеширования
 - SQLite (по умолчанию)
 
@@ -36,7 +33,7 @@ Telegram-бот + веб-приложение для подготовки шко
 - pip
 - Node.js 16+ (для фронтенда)
 
-### Установка и запуск Backend + Bot
+### Установка и запуск Backend
 
 ```bash
 # 1. Клонируйте репозиторий
@@ -54,10 +51,9 @@ pip install -r requirements.txt
 
 # 4. Создайте .env
 cp .env.example .env
-# Отредактируйте .env и установите TELEGRAM_BOT_TOKEN
 
 # 5. Запустите приложение
-python run.py
+python run.py flask
 ```
 
 Приложение будет доступно на `http://localhost:5000`
@@ -76,17 +72,10 @@ npm run dev
 
 Фронтенд будет доступен на `http://localhost:5173`
 
-### Запуск только компонентов Backend
+### Запуск Backend
 
 ```bash
-# Только Flask API:
 python run.py flask
-
-# Только Telegram Bot:
-python run.py bot
-
-# Оба компонента (Flask + Telegram):
-python run.py all  # или просто python run.py
 ```
 
 ## API Endpoints
@@ -121,30 +110,6 @@ python run.py all  # или просто python run.py
 - `GET /api/stats/subjects` - По предметам (protected)
 - `GET /api/stats/streak` - Дневной стрик (protected)
 
-## Telegram Bot
-
-Бот работает на aiogram 3.0+ и поддерживает следующие команды:
-
-- `/start` - Начать работу с ботом
-- `/help` - Справка
-- `/stats` - Просмотр результатов
-
-### Функции бота:
-
-1. **Выбор предмета** - нажми "📚 Выбрать предмет" и выбери интересующий предмет
-2. **Выбор темы** - выбери тему в рамках предмета
-3. **Ответ на вопрос** - бот присылает вопрос, ты отвечаешь (выбором или текстом)
-4. **Проверка ответа** - бот проверяет ответ, показывает статистику
-5. **Просмотр результатов** - нажми "📊 Мои результаты" для просмотра прогресса
-6. **Профиль** - нажми "⚙️ Профиль" для просмотра информации о твоем аккаунте
-
-### Поддерживаемые типы вопросов:
-
-- **Multiple choice** - выбор одного из вариантов (с клавиатурой)
-- **Number input** - ввод числового ответа
-- **Text input** - ввод текстового ответа
-- **Multiple selection** - выбор нескольких правильных ответов
-
 ## Веб-приложение (Frontend)
 
 React/Vite приложение с полным функционалом:
@@ -176,7 +141,6 @@ cd ege-bot
 
 # 2. Создайте .env файл
 cp .env.example .env
-# Отредактируйте .env и установите TELEGRAM_BOT_TOKEN
 
 # 3. Запустите с Docker Compose (включает Redis)
 docker-compose up -d
@@ -186,7 +150,7 @@ docker-compose logs -f app
 ```
 
 Docker Compose запустит:
-- **EGE-Bot приложение** (Flask API + Telegram Bot) на `http://localhost:5000`
+- **EGE-Bot приложение** (Flask API) на `http://localhost:5000`
 - **Redis** для кеширования на `localhost:6379`
 
 ### Standalone Docker
@@ -210,7 +174,6 @@ docker run -p 5000:5000 \
 - `FLASK_ENV=production` - Включает Redis кеширование и оптимизации
 - `REDIS_URL=redis://hostname:6379/0` - Подключение к Redis
 - `JWT_SECRET_KEY=your-secret-key` - JWT токен
-- `TELEGRAM_BOT_TOKEN=your-bot-token` - Telegram бот токен
 
 ## CI/CD и Авторазвертка
 
@@ -223,7 +186,7 @@ docker run -p 5000:5000 \
    - ✅ Сборка фронтенда (Vite)
    - ✅ Тесты (если существуют)
    - ✅ Автоматическая развертка Backend на сервер
-   - ✅ Реальная работа: собирает оба компонента и развертывает их
+   - ✅ Реальная работа: собирает и развертывает backend + frontend
 
 **2. frontend.yml** - Frontend только:
    - ✅ Линтер (ESLint, опционально)
@@ -246,7 +209,7 @@ docker run -p 5000:5000 \
   2. Сборка Frontend (npm run build)
   3. Запуск тестов
   4. SSH деплой на сервер
-  5. Перезагрузка сервисов (Flask + Bot + Nginx)
+   5. Перезагрузка сервисов (Flask API + Nginx)
   ✅ Готово!
 ```
 
@@ -293,7 +256,7 @@ docker run -p 5000:5000 \
    User=appuser
    WorkingDirectory=/opt/ege-bot
    Environment="PATH=/opt/ege-bot/venv/bin"
-   ExecStart=/opt/ege-bot/venv/bin/python run.py all
+   ExecStart=/opt/ege-bot/venv/bin/python run.py flask
    Restart=always
    RestartSec=10
    StandardOutput=journal

@@ -1,3 +1,5 @@
+from typing import Optional
+
 from flask import Blueprint, jsonify, request
 from flask_jwt_extended import jwt_required, get_jwt_identity
 
@@ -53,6 +55,62 @@ def check_answer_with_source(question: Question, user_answer: str) -> bool:
             return remote_result
 
     return check_answer(question, user_answer)
+
+
+def _serialize_history_item(answer: UserAnswer) -> dict:
+    """Serialize history record with question metadata expected by frontend."""
+    result = answer.to_dict()
+    question = answer.question
+
+    if not question:
+        result["question_text"] = None
+        result["question_html_text"] = None
+        result["correct_answer"] = None
+        result["subject_id"] = None
+        result["theme_id"] = None
+        return result
+
+    result["question_text"] = question.text
+    result["question_html_text"] = question.html_text
+    result["subject_id"] = question.subject_id
+    result["theme_id"] = question.theme_id
+
+    if (
+        question.source == "neofamily"
+        and question.answer == NeoFamilyQuestionLoader.REMOTE_CHECK_PLACEHOLDER
+    ):
+        result["correct_answer"] = None
+    else:
+        result["correct_answer"] = question.answer
+
+    return result
+
+
+def _normalize_stat_values(stat: UserStat) -> None:
+    """Normalize nullable counters before arithmetic updates."""
+    stat.total_answers = max(0, stat.total_answers or 0)
+    stat.correct_answers = max(0, stat.correct_answers or 0)
+    if stat.correct_answers > stat.total_answers:
+        stat.correct_answers = stat.total_answers
+
+
+def _decrement_user_stat(stat: Optional[UserStat], was_correct: bool) -> None:
+    """Safely decrement denormalized stat counters."""
+    if not stat:
+        return
+
+    _normalize_stat_values(stat)
+    if stat.total_answers == 0:
+        return
+
+    stat.total_answers -= 1
+    if was_correct and stat.correct_answers > 0:
+        stat.correct_answers -= 1
+    if stat.correct_answers > stat.total_answers:
+        stat.correct_answers = stat.total_answers
+
+    if stat.total_answers == 0 and stat.correct_answers == 0:
+        db.session.delete(stat)
 
 
 @answers_bp.post("")
@@ -168,7 +226,11 @@ def get_answer_history():
     user_id = get_jwt_identity()
     subject_id = request.args.get("subject", type=int)
     theme_id = request.args.get("theme", type=int)
-    limit = request.args.get("limit", 20, type=int)
+    limit = request.args.get("limit", 20, type=int) or 20
+    offset = request.args.get("offset", 0, type=int) or 0
+
+    limit = max(1, min(limit, 100))
+    offset = max(0, offset)
 
     query = UserAnswer.query.filter_by(user_id=user_id)
 
@@ -178,9 +240,48 @@ def get_answer_history():
     if theme_id:
         query = query.join(Question).filter(Question.theme_id == theme_id)
 
-    answers = query.order_by(UserAnswer.answered_at.desc()).limit(limit).all()
+    answers = (
+        query.order_by(UserAnswer.answered_at.desc())
+        .offset(offset)
+        .limit(limit)
+        .all()
+    )
 
-    return jsonify([a.to_dict() for a in answers])
+    return jsonify([_serialize_history_item(a) for a in answers])
+
+
+@answers_bp.delete("/history/<int:answer_id>")
+@jwt_required()
+def delete_history_answer(answer_id: int):
+    """Delete one history item for current user and keep stats in sync."""
+    user_id = get_jwt_identity()
+
+    answer = UserAnswer.query.filter_by(id=answer_id, user_id=user_id).first()
+    if not answer:
+        return jsonify({"error": "History item not found"}), 404
+
+    question = answer.question
+
+    if question:
+        overall_stat = UserStat.query.filter_by(
+            user_id=user_id,
+            subject_id=question.subject_id,
+            theme_id=None,
+        ).first()
+        _decrement_user_stat(overall_stat, answer.is_correct)
+
+        if question.theme_id:
+            theme_stat = UserStat.query.filter_by(
+                user_id=user_id,
+                subject_id=question.subject_id,
+                theme_id=question.theme_id,
+            ).first()
+            _decrement_user_stat(theme_stat, answer.is_correct)
+
+    db.session.delete(answer)
+    db.session.commit()
+
+    return jsonify({"status": "deleted", "id": answer_id})
 
 
 @answers_bp.get("/stats")

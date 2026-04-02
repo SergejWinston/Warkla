@@ -5,12 +5,33 @@ import Layout from '../components/Layout'
 
 export default function History() {
   const navigate = useNavigate()
-  const { history, isLoading, fetchHistory } = useAnswerHistory()
+  const { history, isLoading, error, fetchHistory, deleteHistoryItem } = useAnswerHistory()
   const [page, setPage] = useState(0)
+  const [deletingId, setDeletingId] = useState(null)
 
   useEffect(() => {
     fetchHistory({ limit: 20, offset: page * 20 })
-  }, [page])
+  }, [fetchHistory, page])
+
+  const handleDelete = async (answerId) => {
+    const shouldDelete = window.confirm('Удалить это задание из истории?')
+    if (!shouldDelete) {
+      return
+    }
+
+    setDeletingId(answerId)
+    const wasDeleted = await deleteHistoryItem(answerId)
+    setDeletingId(null)
+
+    if (!wasDeleted) {
+      window.alert('Не удалось удалить запись из истории.')
+      return
+    }
+
+    if (history.length === 1 && page > 0) {
+      setPage((prev) => Math.max(0, prev - 1))
+    }
+  }
 
   return (
     <Layout>
@@ -30,6 +51,12 @@ export default function History() {
           </h1>
         </div>
 
+        {error && !isLoading && (
+          <div className="mb-6 bg-pixel-red/20 border-4 border-pixel-red-dark p-4 font-main font-semibold text-pixel-red-dark">
+            ⚠️ {error}
+          </div>
+        )}
+
         {isLoading ? (
           <div className="bg-pixel-cream border-4 border-pixel-dark p-10 text-center animate-bounce-slow">
             <div className="text-5xl mb-4 animate-spin">⏳</div>
@@ -42,15 +69,15 @@ export default function History() {
                 <div key={answer.id} className="bg-pixel-cream border-4 border-pixel-dark shadow-pixel p-5 hover:shadow-pixel-hover transition-all duration-100 transform hover:translate-x-1 hover:translate-y-1">
                   <div className="flex items-start justify-between gap-4">
                     <div className="flex-1">
-                      <h3 className="font-cute text-lg font-bold text-pixel-dark mb-3">{answer.question_text}</h3>
+                      <h3 className="font-cute text-lg font-bold text-pixel-dark mb-3">{answer.question_text || 'Текст задания недоступен'}</h3>
                       <div className="font-main text-sm text-pixel-dark space-y-2">
                         <p className="flex items-start gap-2">
                           <span className="font-semibold">✍️ Твой ответ:</span>
                           <span className={answer.is_correct ? 'text-pixel-green-dark font-bold' : 'text-pixel-red-dark font-bold'}>
-                            {answer.user_answer}
+                            {answer.user_answer || '—'}
                           </span>
                         </p>
-                        {!answer.is_correct && (
+                        {!answer.is_correct && answer.correct_answer && (
                           <p className="flex items-start gap-2">
                             <span className="font-semibold">✅ Правильный:</span>
                             <span className="font-bold text-pixel-green-dark">{answer.correct_answer}</span>
@@ -68,8 +95,17 @@ export default function History() {
                         </p>
                       </div>
                     </div>
-                    <div className={`text-5xl ml-4 ${answer.is_correct ? 'animate-bounce-slow' : 'animate-wiggle'}`}>
-                      {answer.is_correct ? '✅' : '❌'}
+                    <div className="flex flex-col items-end gap-3 ml-4">
+                      <button
+                        onClick={() => handleDelete(answer.id)}
+                        disabled={deletingId === answer.id}
+                        className="px-3 py-2 bg-pixel-red hover:bg-pixel-red-dark border-3 border-pixel-dark shadow-pixel-sm hover:shadow-pixel font-main font-bold text-xs text-white transition-all duration-100 transform hover:translate-x-0.5 hover:translate-y-0.5 disabled:opacity-60 disabled:cursor-not-allowed disabled:transform-none"
+                      >
+                        {deletingId === answer.id ? 'Удаляю...' : 'Удалить'}
+                      </button>
+                      <div className={`text-5xl ${answer.is_correct ? 'animate-bounce-slow' : 'animate-wiggle'}`}>
+                        {answer.is_correct ? '✅' : '❌'}
+                      </div>
                     </div>
                   </div>
                 </div>

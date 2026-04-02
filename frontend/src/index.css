@@ -277,3 +277,16 @@ select.pixel-input option {
 ::-webkit-scrollbar-thumb:hover {
   background: #8b6aaa;
 }
+
+/* Disable jumpy motion effects globally */
+[class*='animate-'] {
+  animation: none !important;
+}
+
+/* Prevent hover translate classes from shifting elements */
+[class*='hover:translate-x-']:hover,
+[class*='hover:translate-y-']:hover,
+.pixel-btn:hover,
+.pixel-btn:active {
+  transform: none !important;
+}

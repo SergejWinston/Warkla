@@ -152,14 +152,28 @@ export const useAnswerHistory = () => {
     setError(null)
     try {
       const { data } = await answersAPI.getHistory(params)
-      setHistory(data)
-      return data
+      const normalized = Array.isArray(data) ? data : []
+      setHistory(normalized)
+      return normalized
     } catch (err) {
       setError(err.response?.data?.error || 'Failed to fetch history')
+      return []
     } finally {
       setIsLoading(false)
     }
   }, [])
 
-  return { history, isLoading, error, fetchHistory }
+  const deleteHistoryItem = useCallback(async (answerId) => {
+    setError(null)
+    try {
+      await answersAPI.deleteHistoryItem(answerId)
+      setHistory((prev) => prev.filter((item) => item.id !== answerId))
+      return true
+    } catch (err) {
+      setError(err.response?.data?.error || 'Failed to delete history item')
+      return false
+    }
+  }, [])
+
+  return { history, isLoading, error, fetchHistory, deleteHistoryItem }
 }

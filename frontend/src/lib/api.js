@@ -65,6 +65,7 @@ export const answersAPI = {
   submit: (questionId, userAnswer) =>
     api.post('/answers', { question_id: questionId, answer: userAnswer }),
   getHistory: (params = {}) => api.get('/answers/history', { params }),
+  deleteHistoryItem: (answerId) => api.delete(`/answers/history/${answerId}`),
 }
 
 export const statsAPI = {

@@ -7,6 +7,8 @@ export default function Stats() {
   const { stats } = useStatsBySubjects()
   const { streak } = useStreak()
   const { leaderboard } = useLeaderboard()
+  const dayStreak = Number(streak?.day_streak ?? streak?.current_streak ?? 0)
+  const isZeroStreak = dayStreak === 0
 
   return (
     <Layout>
@@ -28,16 +30,20 @@ export default function Stats() {
 
         {/* Streak */}
         {streak && (
-          <div className="bg-gradient-to-r from-pixel-yellow to-pixel-orange border-6 border-pixel-dark shadow-pixel-lg p-8 mb-8 animate-fade-in">
+          <div className={`${isZeroStreak ? 'bg-gray-200' : 'bg-gradient-to-r from-pixel-yellow to-pixel-orange'} border-6 border-pixel-dark shadow-pixel-lg p-8 mb-8 animate-fade-in`}>
             <div className="flex items-center gap-4 mb-4">
-              <span className="text-6xl animate-heartbeat">🔥</span>
+              <span className={`text-6xl ${isZeroStreak ? 'text-gray-500' : 'animate-heartbeat'}`}>🔥</span>
               <div>
-                <h2 className="font-cute text-3xl font-bold text-pixel-dark">Дневной стрик</h2>
-                <p className="font-main text-pixel-dark/70">Так держать!</p>
+                <h2 className={`font-cute text-3xl font-bold ${isZeroStreak ? 'text-gray-600' : 'text-pixel-dark'}`}>Дневной стрик</h2>
+                <p className={`font-main ${isZeroStreak ? 'text-gray-500' : 'text-pixel-dark/70'}`}>{isZeroStreak ? 'Серия пока не началась' : 'Так держать!'}</p>
               </div>
             </div>
-            <p className="font-cute text-6xl font-bold text-pixel-dark mb-3">{streak.day_streak} дней</p>
-            <p className="font-main font-semibold text-pixel-dark/80">Продолжай решать вопросы каждый день! 💪</p>
+            <p className={`${isZeroStreak ? 'text-3xl text-gray-600' : 'text-6xl text-pixel-dark'} font-cute font-bold mb-3`}>
+              {isZeroStreak ? '0 дней в страйке' : `${dayStreak} дней`}
+            </p>
+            <p className={`font-main font-semibold ${isZeroStreak ? 'text-gray-500' : 'text-pixel-dark/80'}`}>
+              {isZeroStreak ? 'Реши первый вопрос сегодня, чтобы запустить серию.' : 'Продолжай решать вопросы каждый день! 💪'}
+            </p>
           </div>
         )}
 

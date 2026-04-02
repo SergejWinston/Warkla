@@ -39,6 +39,37 @@ const navCards = [
   },
 ]
 
+const sortFieldOptions = [
+  { value: 'id', label: 'ID задания' },
+  { value: 'difficulty', label: 'Сложность' },
+  { value: 'created_at', label: 'Дата добавления' },
+  { value: 'updated_at', label: 'Дата обновления' },
+  { value: 'question_type', label: 'Тип задания' },
+  { value: 'theme_id', label: 'ID темы' },
+]
+
+const sortOrderOptions = [
+  { value: 'asc', label: 'По возрастанию' },
+  { value: 'desc', label: 'По убыванию' },
+]
+
+const perPageOptions = [10, 15, 25, 50]
+const DEFAULT_SORT_BY = 'id'
+const DEFAULT_SORT_ORDER = 'asc'
+const DEFAULT_PER_PAGE = 15
+
+const sanitizeHtml = (rawHtml) => {
+  if (!rawHtml) return ''
+
+  return String(rawHtml)
+    .replace(/<script[\s\S]*?>[\s\S]*?<\/script>/gi, '')
+    .replace(/<style[\s\S]*?>[\s\S]*?<\/style>/gi, '')
+    .replace(/\son[a-z]+\s*=\s*"[^"]*"/gi, '')
+    .replace(/\son[a-z]+\s*=\s*'[^']*'/gi, '')
+    .replace(/\son[a-z]+\s*=\s*[^\s>]+/gi, '')
+    .replace(/javascript:/gi, '')
+}
+
 const withAlpha = (color, alphaSuffix) => {
   if (typeof color !== 'string') return null
   if (color.startsWith('#') && color.length === 7) {
@@ -66,7 +97,9 @@ export default function Dashboard() {
 
   const [selectedSubject, setSelectedSubject] = useState(null)
   const [selectedTheme, setSelectedTheme] = useState(null)
-  const [taskSortOrder, setTaskSortOrder] = useState('asc')
+  const [taskSortBy, setTaskSortBy] = useState(DEFAULT_SORT_BY)
+  const [taskSortOrder, setTaskSortOrder] = useState(DEFAULT_SORT_ORDER)
+  const [tasksPerPage, setTasksPerPage] = useState(DEFAULT_PER_PAGE)
   const [isPracticeStarted, setIsPracticeStarted] = useState(false)
   const [resultsByQuestion, setResultsByQuestion] = useState({})
   const [submittingQuestionId, setSubmittingQuestionId] = useState(null)
@@ -78,7 +111,6 @@ export default function Dashboard() {
     questions,
     isLoading: questionLoading,
     error: questionError,
-    startSession,
     loadPage,
     pagination,
     resetSession,
@@ -88,16 +120,51 @@ export default function Dashboard() {
 
   const totalAnswers = stats?.total_answers || 0
   const correctAnswers = stats?.correct_answers || 0
+  const dayStreak = Number(streak?.day_streak ?? streak?.current_streak ?? 0)
+  const isZeroStreak = dayStreak === 0
   const accuracy = useMemo(() => {
     if (!totalAnswers) return 0
     return Math.round((correctAnswers / totalAnswers) * 100)
   }, [correctAnswers, totalAnswers])
+  const activeSortFieldLabel = useMemo(() => {
+    const match = sortFieldOptions.find((option) => option.value === taskSortBy)
+    return match?.label || 'ID задания'
+  }, [taskSortBy])
+  const activeSortOrderLabel = taskSortOrder === 'asc' ? 'по возрастанию' : 'по убыванию'
 
   const resetPracticeView = () => {
     setResultsByQuestion({})
     setSubmittingQuestionId(null)
     setAnswersCount(0)
     setNoTasks(false)
+  }
+
+  const handleBackToThemes = () => {
+    setIsPracticeStarted(false)
+    setSelectedTheme(null)
+    resetSession()
+    resetPracticeView()
+  }
+
+  const loadPracticeTasks = async ({ page = 1, themeId = selectedTheme?.id, sortBy = taskSortBy, sortOrder = taskSortOrder, perPage = tasksPerPage } = {}) => {
+    if (!selectedSubject) return null
+
+    resetPracticeView()
+
+    const firstQuestion = await loadPage({
+      subjectSlug: selectedSubject.slug,
+      themeId,
+      page,
+      perPage,
+      sortBy,
+      sortOrder,
+    })
+
+    if (!firstQuestion) {
+      setNoTasks(true)
+    }
+
+    return firstQuestion
   }
 
   const handleSubjectSelect = (subject) => {
@@ -121,19 +188,10 @@ export default function Dashboard() {
 
     setSelectedTheme(theme)
     setIsPracticeStarted(true)
-    resetPracticeView()
-
-    const firstQuestion = await startSession({
-      subjectSlug: selectedSubject.slug,
+    await loadPracticeTasks({
+      page: 1,
       themeId: theme?.id,
-      perPage: 15,
-      sortBy: 'id',
-      sortOrder: taskSortOrder,
     })
-
-    if (!firstQuestion) {
-      setNoTasks(true)
-    }
   }
 
   const handleAnswerSubmit = async (questionId, answer) => {
@@ -167,20 +225,7 @@ export default function Dashboard() {
       return
     }
 
-    resetPracticeView()
-
-    const firstQuestion = await loadPage({
-      subjectSlug: selectedSubject.slug,
-      themeId: selectedTheme?.id,
-      page: targetPage,
-      perPage: 15,
-      sortBy: 'id',
-      sortOrder: taskSortOrder,
-    })
-
-    if (!firstQuestion) {
-      setNoTasks(true)
-    }
+    await loadPracticeTasks({ page: targetPage })
   }
 
   useEffect(() => {
@@ -196,28 +241,34 @@ export default function Dashboard() {
     navigate('/login')
   }
 
-  const handleSortChange = async (event) => {
-    const nextSortOrder = event.target.value
-    setTaskSortOrder(nextSortOrder)
+  const handleApplyPracticeSettings = async () => {
+    if (!isPracticeStarted || !selectedSubject) {
+      return
+    }
+
+    await loadPracticeTasks({
+      page: 1,
+      sortBy: taskSortBy,
+      sortOrder: taskSortOrder,
+      perPage: tasksPerPage,
+    })
+  }
+
+  const handleResetPracticeSettings = async () => {
+    setTaskSortBy(DEFAULT_SORT_BY)
+    setTaskSortOrder(DEFAULT_SORT_ORDER)
+    setTasksPerPage(DEFAULT_PER_PAGE)
 
     if (!isPracticeStarted || !selectedSubject) {
       return
     }
 
-    resetPracticeView()
-
-    const firstQuestion = await loadPage({
-      subjectSlug: selectedSubject.slug,
-      themeId: selectedTheme?.id,
+    await loadPracticeTasks({
       page: 1,
-      perPage: 15,
-      sortBy: 'id',
-      sortOrder: nextSortOrder,
+      sortBy: DEFAULT_SORT_BY,
+      sortOrder: DEFAULT_SORT_ORDER,
+      perPage: DEFAULT_PER_PAGE,
     })
-
-    if (!firstQuestion) {
-      setNoTasks(true)
-    }
   }
 
   if (!user) {
@@ -235,7 +286,8 @@ export default function Dashboard() {
 
   return (
     <Layout>
-      <div className="space-y-8">
+      <main>
+        <div className="space-y-8">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 animate-slide-up">
           <div className="bg-pixel-blue border-4 border-pixel-dark shadow-pixel p-6 transform hover:translate-x-1 hover:translate-y-1 transition-all duration-100">
             <div className="flex items-center gap-3 mb-3">
@@ -253,12 +305,14 @@ export default function Dashboard() {
             <p className="font-main font-semibold text-pixel-dark">Точность</p>
           </div>
 
-          <div className="bg-pixel-yellow border-4 border-pixel-dark shadow-pixel p-6 transform hover:translate-x-1 hover:translate-y-1 transition-all duration-100">
+          <div className={`${isZeroStreak ? 'bg-gray-200' : 'bg-pixel-yellow'} border-4 border-pixel-dark shadow-pixel p-6 transform hover:translate-x-1 hover:translate-y-1 transition-all duration-100`}>
             <div className="flex items-center gap-3 mb-3">
-              <span className="text-4xl animate-heartbeat">🔥</span>
-              <div className="text-4xl font-cute font-bold text-pixel-dark">{streak?.day_streak || 0}</div>
+              <span className={`text-4xl ${isZeroStreak ? 'text-gray-500' : 'animate-heartbeat'}`}>🔥</span>
+              <div className={`${isZeroStreak ? 'text-xl text-gray-600 leading-tight' : 'text-4xl text-pixel-dark'} font-cute font-bold`}>
+                {isZeroStreak ? '0 дней в страйке' : dayStreak}
+              </div>
             </div>
-            <p className="font-main font-semibold text-pixel-dark">Дневной стрик</p>
+            <p className={`font-main font-semibold ${isZeroStreak ? 'text-gray-600' : 'text-pixel-dark'}`}>Дневной стрик</p>
           </div>
         </div>
 
@@ -396,46 +450,86 @@ export default function Dashboard() {
           )}
 
           {selectedSubject && isPracticeStarted && (
-            <div className="space-y-5">
-              <div className="flex flex-wrap items-start justify-between gap-4">
-                <div>
-                  <h3 className="font-cute text-3xl font-bold text-pixel-dark flex items-center gap-3">
-                    <span className="text-4xl">✍️</span>
-                    Решение заданий
-                  </h3>
-                  <p className="font-main text-pixel-dark/70 mt-2">
-                    {selectedSubject.name}
-                    {selectedTheme ? ` • ${selectedTheme.name}` : ' • все задания'}
-                  </p>
-                </div>
-                <div className="flex items-center gap-3 flex-wrap">
-                  <div className="flex items-center gap-2">
-                    <label className="font-main font-semibold text-pixel-dark" htmlFor="task-sort-order">
-                      🔀 Сортировка:
-                    </label>
-                    <select
-                      id="task-sort-order"
-                      value={taskSortOrder}
-                      onChange={handleSortChange}
-                      className="px-3 py-2 bg-white border-4 border-pixel-dark shadow-pixel-sm font-main font-semibold text-pixel-dark focus:border-pixel-pink focus:shadow-pixel-pink transition-all"
+            <div className="flex flex-col md:flex-row gap-8">
+              {/* Sidebar */}
+              <aside className="w-full md:w-64 bg-white border-4 border-pixel-dark shadow-pixel p-5 space-y-6 flex-shrink-0 animate-slide-left">
+                  <h4 className="font-cute text-xl font-bold text-pixel-dark mb-2 flex items-center gap-2">
+                    <span className="text-2xl">⚙️</span> Фильтры и сортировка
+                  </h4>
+                  <div className="space-y-4">
+                    <div>
+                      <label className="font-main font-semibold text-pixel-dark block mb-1" htmlFor="sort-field">Поле сортировки</label>
+                      <select
+                        id="sort-field"
+                        value={taskSortBy}
+                        onChange={e => setTaskSortBy(e.target.value)}
+                        className="w-full px-3 py-2 bg-white border-4 border-pixel-dark shadow-pixel-sm font-main font-semibold text-pixel-dark focus:border-pixel-pink focus:shadow-pixel-pink transition-all"
+                      >
+                        {sortFieldOptions.map(opt => (
+                          <option key={opt.value} value={opt.value}>{opt.label}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="font-main font-semibold text-pixel-dark block mb-1" htmlFor="sort-order">Порядок</label>
+                      <select
+                        id="sort-order"
+                        value={taskSortOrder}
+                        onChange={e => setTaskSortOrder(e.target.value)}
+                        className="w-full px-3 py-2 bg-white border-4 border-pixel-dark shadow-pixel-sm font-main font-semibold text-pixel-dark focus:border-pixel-pink focus:shadow-pixel-pink transition-all"
+                      >
+                        {sortOrderOptions.map(opt => (
+                          <option key={opt.value} value={opt.value}>{opt.label}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="font-main font-semibold text-pixel-dark block mb-1" htmlFor="per-page">Заданий на страницу</label>
+                      <select
+                        id="per-page"
+                        value={tasksPerPage}
+                        onChange={e => setTasksPerPage(Number(e.target.value))}
+                        className="w-full px-3 py-2 bg-white border-4 border-pixel-dark shadow-pixel-sm font-main font-semibold text-pixel-dark focus:border-pixel-pink focus:shadow-pixel-pink transition-all"
+                      >
+                        {perPageOptions.map(opt => (
+                          <option key={opt} value={opt}>{opt}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                  <div className="flex gap-2 mt-4">
+                    <button
+                      onClick={handleApplyPracticeSettings}
+                      className="flex-1 py-3 bg-pixel-green hover:bg-pixel-green-dark border-4 border-pixel-dark shadow-pixel hover:shadow-pixel-hover font-cute font-bold text-pixel-dark transition-all duration-100 transform hover:translate-x-1 hover:translate-y-1"
                     >
-                      <option value="asc">По возрастанию ID</option>
-                      <option value="desc">По убыванию ID</option>
-                    </select>
+                      Применить
+                    </button>
+                    <button
+                      onClick={handleResetPracticeSettings}
+                      className="flex-1 py-3 bg-pixel-yellow hover:bg-pixel-yellow-dark border-4 border-pixel-dark shadow-pixel hover:shadow-pixel-hover font-cute font-bold text-pixel-dark transition-all duration-100 transform hover:translate-x-1 hover:translate-y-1"
+                    >
+                      Сбросить
+                    </button>
                   </div>
                   <button
-                    onClick={() => {
-                      setIsPracticeStarted(false)
-                      setSelectedTheme(null)
-                      resetSession()
-                      resetPracticeView()
-                    }}
-                    className="px-4 py-2 bg-pixel-purple hover:bg-pixel-purple-dark border-4 border-pixel-dark shadow-pixel hover:shadow-pixel-hover font-cute font-bold text-pixel-dark transition-all duration-100 transform hover:translate-x-1 hover:translate-y-1"
+                    onClick={handleBackToThemes}
+                    className="w-full mt-4 py-3 bg-pixel-purple hover:bg-pixel-purple-dark border-4 border-pixel-dark shadow-pixel hover:shadow-pixel-hover font-cute font-bold text-pixel-dark transition-all duration-100 transform hover:translate-x-1 hover:translate-y-1"
                   >
-                    Сменить тему 🔄
+                    ← Сменить тему
                   </button>
-                </div>
-              </div>
+              </aside>
+              {/* Main content */}
+              <div className="flex-1 space-y-5">
+                  <div>
+                    <h3 className="font-cute text-3xl font-bold text-pixel-dark flex items-center gap-3">
+                      <span className="text-4xl">✍️</span>
+                      Решение заданий
+                    </h3>
+                    <p className="font-main text-pixel-dark/70 mt-2">
+                      {selectedSubject.name}
+                      {selectedTheme ? ` • ${selectedTheme.name}` : ' • все задания'}
+                    </p>
+                  </div>
 
               <SubjectBanner banner={banner} />
 
@@ -474,6 +568,7 @@ export default function Dashboard() {
                   {questions.map((questionItem, index) => {
                     const result = resultsByQuestion[questionItem.id]
                     const isSubmitting = submittingQuestionId === questionItem.id
+                    const safeHintHtml = sanitizeHtml(result?.solution_html || result?.explanation)
 
                     return (
                       <div key={questionItem.id} className="bg-white border-4 border-pixel-dark shadow-pixel p-5 md:p-6 space-y-4">
@@ -519,8 +614,11 @@ export default function Dashboard() {
                                 Правильный ответ: <strong className="font-cute">{result.correct_answer}</strong>
                               </p>
                             )}
-                            {result.explanation && (
-                              <p className="font-main text-sm text-pixel-dark/80 mt-2">{result.explanation}</p>
+                            {safeHintHtml && (
+                              <div
+                                className="task-content font-main text-sm text-pixel-dark/80 mt-2"
+                                dangerouslySetInnerHTML={{ __html: safeHintHtml }}
+                              />
                             )}
                           </div>
                         )}
@@ -565,6 +663,7 @@ export default function Dashboard() {
                   </button>
                 </div>
               )}
+              </div>
             </div>
           )}
         </section>
@@ -588,7 +687,8 @@ export default function Dashboard() {
             ))}
           </div>
         </section>
+        </div>
       </main>
-    </div>
+    </Layout>
   )
 }
